@@ -225,8 +225,31 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
 
       if (!tokenData.token || !tokenData.url) {
         console.warn('[LiveKit] No LiveKit server credentials returned from token endpoint.');
-        setErrorMessage('Voice agent is currently offline. You can still ask questions via text below.');
-        setState('idle');
+        setErrorMessage(
+          'LiveKit Cloud keys not detected in .env.local — asking questions via text with verified citations is active below.'
+        );
+
+        const welcomeMsg: ChatMessage = {
+          id: `welcome-${Date.now()}`,
+          sender: 'assistant',
+          text: "Hi! I’m Suyash’s AI digital twin. Ask me about PathFlow, my research paper at ICDDS 2025, technical skills, or internships.",
+          citations: [
+            {
+              source_id: 'resume-identity',
+              title: 'Suyash Singh — Identity & Verified Links',
+              section: 'Header / Identity',
+              entity: 'Suyash Singh',
+              page: 1,
+              source: 'Suyash Singh Resume',
+              source_type: 'resume',
+              snippet:
+                'Suyash Singh is a Computer Science Engineering (Data Science) undergraduate at Manipal Institute of Technology (graduating 2027) with a strong foundation in full-stack engineering, distributed systems, AI agent observability, and machine learning pipelines.',
+            },
+          ],
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+
+        setMessages((prev) => (prev.length === 0 ? [welcomeMsg] : prev));
         return;
       }
 
