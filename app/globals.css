@@ -3,12 +3,33 @@
 :root {
   --bg: #FAFAF9;
   --bg-surface: #FFFFFF;
+  --bg-input: #FFFFFF;
   --text-primary: #111111;
-  --text-secondary: #666666;
-  --text-muted: #888888;
-  --line: #EAEAEA;
+  --text-secondary: #6B6B6B;
+  --text-muted: #8A8A8A;
+  --line: #E8E8E6;
   --line-hover: #D4D4D4;
+  --btn-bg: #111111;
+  --btn-text: #FFFFFF;
+  --btn-hover: #2A2A2A;
   --accent-green: #16A34A;
+  --selection: #EAEAEA;
+}
+
+.dark {
+  --bg: #0C0C0C;
+  --bg-surface: #141414;
+  --bg-input: #171717;
+  --text-primary: #F0F0F0;
+  --text-secondary: #9E9E9E;
+  --text-muted: #666666;
+  --line: #222222;
+  --line-hover: #333333;
+  --btn-bg: #F0F0F0;
+  --btn-text: #0C0C0C;
+  --btn-hover: #FFFFFF;
+  --accent-green: #22C55E;
+  --selection: #2A2A2A;
 }
 
 * {
@@ -29,6 +50,7 @@ body {
   overflow-x: hidden;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Subtle Quiet Pulse for Voice State */
@@ -62,6 +84,14 @@ body {
   border-radius: 2px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #333333;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #C0C0C0;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #444444;
 }

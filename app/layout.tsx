@@ -52,15 +52,17 @@ export const metadata: Metadata = {
   },
 };
 
+import { ThemeProvider } from '@/components/ThemeProvider';
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-      <body className="bg-[#FAFAF9] text-[#111111] min-h-screen selection:bg-[#EAEAEA]">
-        {children}
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+      <body className="bg-[var(--bg)] text-[var(--text-primary)] min-h-screen selection:bg-[var(--selection)]">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
