@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
         url: livekitUrl || null,
         roomName,
         participantName,
-        mode: 'web_speech_direct',
-        warning: 'LIVEKIT_API_KEY and LIVEKIT_API_SECRET not set. Operating in high-fidelity Direct Audio / Web Speech mode.',
+        mode: 'text_fallback',
+        warning: 'LIVEKIT_API_KEY and LIVEKIT_API_SECRET not set. Realtime voice agent requires LiveKit cloud credentials.',
       });
     }
 

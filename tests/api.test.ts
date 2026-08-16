@@ -56,7 +56,7 @@ describe('API Routes Verification', () => {
     const data = await res.json();
     expect(data.roomName).toBe('test-room');
     expect(data.participantName).toBe('test-user');
-    expect(['livekit_webrtc', 'web_speech_direct']).toContain(data.mode);
+    expect(['livekit_webrtc', 'text_fallback']).toContain(data.mode);
   });
 
   it('POST /api/tts validates input and returns response', async () => {
