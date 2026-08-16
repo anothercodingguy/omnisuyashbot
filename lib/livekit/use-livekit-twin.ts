@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Room, RoomEvent, Track, RemoteParticipant, DataPacket_Kind } from 'livekit-client';
+import {
+  Room,
+  RoomEvent,
+  Track,
+  RemoteParticipant,
+  RemoteTrack,
+  RemoteTrackPublication,
+  Participant,
+} from 'livekit-client';
 import { VoiceState } from '@/components/AudioOrb';
 import { ChatMessage } from '@/components/LiveTranscript';
 import { CitationItem } from '@/lib/knowledge/grounding';
@@ -35,43 +43,74 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
 
   const roomRef = useRef<Room | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const localAnalyserRef = useRef<AnalyserNode | null>(null);
+  const remoteAnalyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
   const animFrameRef = useRef<number | null>(null);
   const isDirectModeRef = useRef<boolean>(true);
+  const audioElementsRef = useRef<HTMLMediaElement[]>([]);
+  const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  // Audio Level Analyser Loop
+  // Initialize or resume the Web Audio Context (handles browser autoplay policies)
+  const getAudioContext = useCallback(async (): Promise<AudioContext> => {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioCtx();
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  // Audio Level Analyser Loop for microphone and remote audio
   const startAudioAnalysis = (stream: MediaStream) => {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioCtx();
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64;
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
+      getAudioContext().then((audioCtx) => {
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
 
-      audioContextRef.current = audioCtx;
-      analyserRef.current = analyser;
+        localAnalyserRef.current = analyser;
 
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-      const checkLevel = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const avg = sum / dataArray.length;
-        const normalized = Math.min(1, avg / 128);
-        setAudioLevel(normalized);
+        const checkLevel = () => {
+          const activeAnalyser = remoteAnalyserRef.current || localAnalyserRef.current;
+          if (activeAnalyser) {
+            activeAnalyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              sum += dataArray[i];
+            }
+            const avg = sum / dataArray.length;
+            const normalized = Math.min(1, avg / 128);
+            setAudioLevel(normalized);
+          }
 
-        animFrameRef.current = requestAnimationFrame(checkLevel);
-      };
+          animFrameRef.current = requestAnimationFrame(checkLevel);
+        };
 
-      checkLevel();
+        checkLevel();
+      });
     } catch (e) {
       console.warn('[Audio Analysis Error]', e);
+    }
+  };
+
+  const startRemoteAudioAnalysis = (remoteStream: MediaStream) => {
+    try {
+      getAudioContext().then((audioCtx) => {
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        const source = audioCtx.createMediaStreamSource(remoteStream);
+        source.connect(analyser);
+        remoteAnalyserRef.current = analyser;
+      });
+    } catch (e) {
+      console.warn('[Remote Audio Analysis Error]', e);
     }
   };
 
@@ -85,60 +124,117 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
     }
+    remoteAnalyserRef.current = null;
+    localAnalyserRef.current = null;
     setAudioLevel(0);
   };
 
-  // Speaks assistant answer via Web Audio Synthesis with dynamic Orb animation
-  const speakText = useCallback((text: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-        resolve();
-        return;
-      }
-
+  // Stops currently playing TTS audio (for interruption handling)
+  const interruptPlayback = useCallback(() => {
+    if (currentAudioSourceRef.current) {
+      try {
+        currentAudioSourceRef.current.stop();
+        currentAudioSourceRef.current.disconnect();
+      } catch (e) {}
+      currentAudioSourceRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.05;
-      utterance.pitch = 0.98;
+    }
+  }, []);
 
-      // Select a natural English voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const preferred =
-        voices.find((v) => v.name.includes('Google US English') || v.name.includes('Samantha') || v.name.includes('Daniel') || (v.lang === 'en-US' && !v.name.includes('Zira'))) ||
-        voices.find((v) => v.lang.startsWith('en')) ||
-        voices[0];
-
-      if (preferred) utterance.voice = preferred;
-
+  // Server-Side TTS Audio Generation and Playback with fallback
+  const playServerTTS = useCallback(
+    async (text: string): Promise<void> => {
+      interruptPlayback();
       setState('speaking');
 
-      // Create synthetic audio level fluctuations during speech
-      const speechInterval = setInterval(() => {
-        setAudioLevel(0.3 + Math.random() * 0.5);
-      }, 100);
+      try {
+        console.log('[TTS] Requesting server-side TTS audio for answer...');
+        const res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
 
-      utterance.onend = () => {
-        clearInterval(speechInterval);
-        setAudioLevel(0);
-        setState((current) => (current === 'speaking' ? 'listening' : current));
-        resolve();
-      };
+        if (res.ok && res.headers.get('Content-Type')?.includes('audio')) {
+          console.log('[TTS] Received binary audio stream from server, decoding...');
+          const arrayBuffer = await res.arrayBuffer();
+          const audioCtx = await getAudioContext();
+          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-      utterance.onerror = () => {
-        clearInterval(speechInterval);
-        setAudioLevel(0);
-        setState((current) => (current === 'speaking' ? 'listening' : current));
-        resolve();
-      };
+          const source = audioCtx.createBufferSource();
+          source.buffer = audioBuffer;
 
-      window.speechSynthesis.speak(utterance);
-    });
-  }, []);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          source.connect(analyser);
+          analyser.connect(audioCtx.destination);
+          remoteAnalyserRef.current = analyser;
+
+          currentAudioSourceRef.current = source;
+
+          return new Promise<void>((resolve) => {
+            source.onended = () => {
+              console.log('[AUDIO] TTS playback completed');
+              remoteAnalyserRef.current = null;
+              currentAudioSourceRef.current = null;
+              setState('listening');
+              resolve();
+            };
+
+            source.start(0);
+            console.log('[AUDIO] TTS audio playback started through Web Audio API');
+          });
+        } else {
+          console.warn('[TTS] Server-side TTS endpoint returned non-audio, falling back to secondary speech synthesis');
+          throw new Error('Server TTS unavailable');
+        }
+      } catch (err) {
+        console.warn('[TTS] Fallback to client speech synthesis:', err);
+        return new Promise<void>((resolve) => {
+          if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+            setState('listening');
+            resolve();
+            return;
+          }
+
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 1.02;
+          utterance.pitch = 0.98;
+
+          const voices = window.speechSynthesis.getVoices();
+          const preferred =
+            voices.find((v) => v.name.includes('Google US English') || v.name.includes('Samantha') || v.name.includes('Daniel') || (v.lang === 'en-US' && !v.name.includes('Zira'))) ||
+            voices.find((v) => v.lang.startsWith('en')) ||
+            voices[0];
+
+          if (preferred) utterance.voice = preferred;
+
+          utterance.onend = () => {
+            setState('listening');
+            resolve();
+          };
+
+          utterance.onerror = () => {
+            setState('listening');
+            resolve();
+          };
+
+          window.speechSynthesis.speak(utterance);
+        });
+      }
+    },
+    [getAudioContext, interruptPlayback]
+  );
 
   // Sends a message to the unified RAG backend
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
+
+      interruptPlayback();
 
       const userMsg: ChatMessage = {
         id: `user-${Date.now()}`,
@@ -158,6 +254,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
           citedChunkIds: m.citations?.map((c) => c.source_id),
         }));
 
+        console.log(`[QUERY] Sending user query to unified RAG: "${text.trim()}"`);
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -168,6 +265,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         });
 
         const data = await res.json();
+        console.log(`[LLM] Received grounded response with ${data.citations?.length || 0} citations`);
 
         const assistantMsg: ChatMessage = {
           id: `ai-${Date.now()}`,
@@ -179,9 +277,9 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
 
         setMessages((prev) => [...prev, assistantMsg]);
 
-        // Speak the answer if user is in an active voice session
+        // If in an active voice call, generate and play real spoken TTS audio
         if (state !== 'idle' && state !== 'ended') {
-          await speakText(assistantMsg.text);
+          await playServerTTS(assistantMsg.text);
         } else {
           setState('idle');
         }
@@ -191,7 +289,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         setState('error');
       }
     },
-    [messages, state, speakText]
+    [messages, state, playServerTTS, interruptPlayback]
   );
 
   // Setup Web Speech Recognition for Real-time Voice Detection
@@ -210,6 +308,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
+      console.log('[STT] Speech recognition started');
       setState('listening');
     };
 
@@ -227,10 +326,17 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       }
 
       if (interim) {
+        // Interruption: User started speaking while AI was speaking
+        if (state === 'speaking') {
+          console.log('[VOICE] User interrupted speech playback');
+          interruptPlayback();
+          setState('listening');
+        }
         setInterimTranscript(interim);
       }
 
       if (finalStr && finalStr.trim().length > 0) {
+        console.log(`[STT] User utterance recognized: "${finalStr.trim()}"`);
         setInterimTranscript('');
         recognition.stop();
         sendMessage(finalStr.trim()).then(() => {
@@ -243,12 +349,11 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
 
     recognition.onerror = (e: any) => {
       if (e.error !== 'no-speech') {
-        console.warn('[Speech Recognition Error]', e.error);
+        console.warn('[STT] Speech Recognition Error:', e.error);
       }
     };
 
     recognition.onend = () => {
-      // Auto-restart if we are still connected and not speaking
       if (roomRef.current || isDirectModeRef.current) {
         try {
           if (state === 'listening') {
@@ -259,13 +364,16 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     };
 
     recognitionRef.current = recognition;
-  }, [sendMessage, state]);
+  }, [sendMessage, state, interruptPlayback]);
 
-  // Connects Call (LiveKit WebRTC with Seamless Direct Voice Twin Fallback)
+  // Connects Call (LiveKit WebRTC + Server-Side TTS Fallback)
   const startCall = async () => {
     try {
       setState('connecting');
       setErrorMessage(null);
+
+      // Unlock AudioContext for browser autoplay policy
+      await getAudioContext();
 
       // 1. Request microphone permission
       let stream: MediaStream | null = null;
@@ -314,12 +422,59 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
           });
 
           room.on(RoomEvent.Connected, () => {
+            console.log('[LIVEKIT] Connected to room:', room.name);
             setState('listening');
           });
 
           room.on(RoomEvent.Disconnected, () => {
+            console.log('[LIVEKIT] Disconnected from room');
             setState('ended');
             stopAudioAnalysis();
+          });
+
+          room.on(RoomEvent.Reconnecting, () => {
+            console.log('[LIVEKIT] Reconnecting to room...');
+            setState('reconnecting');
+          });
+
+          room.on(RoomEvent.Reconnected, () => {
+            console.log('[LIVEKIT] Reconnected to room');
+            setState('listening');
+          });
+
+          // ─── CRITICAL: Subscribe to Remote Audio Track and Attach to DOM Audio Element ───
+          room.on(
+            RoomEvent.TrackSubscribed,
+            (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+              console.log(`[AUDIO] Remote track subscribed from participant ${participant.identity} (kind: ${track.kind})`);
+              if (track.kind === Track.Kind.Audio) {
+                const audioElement = track.attach();
+                audioElement.id = `remote-audio-${participant.identity}`;
+                audioElement.autoplay = true;
+                audioElementsRef.current.push(audioElement);
+                document.body.appendChild(audioElement);
+
+                if (track.mediaStreamTrack) {
+                  const remoteStream = new MediaStream([track.mediaStreamTrack]);
+                  startRemoteAudioAnalysis(remoteStream);
+                }
+              }
+            }
+          );
+
+          room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+            console.log('[AUDIO] Remote track unsubscribed');
+            track.detach().forEach((el) => el.remove());
+          });
+
+          // Update active speaker states
+          room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
+            const isAgentSpeaking = speakers.some((p) => p !== room.localParticipant);
+            if (isAgentSpeaking) {
+              setState('speaking');
+            } else if (state === 'speaking') {
+              setState('listening');
+            }
           });
 
           // Listen for real-time citations & transcripts over LiveKit Data Channel
@@ -360,7 +515,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       }
 
       if (!connectedLiveKit) {
-        // High-Fidelity Direct Voice Mode
+        // High-Fidelity Direct Voice Mode with Realtime Server-Side TTS
         isDirectModeRef.current = true;
         initSpeechRecognition();
         try {
@@ -392,7 +547,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         };
 
         setMessages((prev) => (prev.length === 0 ? [welcomeMsg] : prev));
-        await speakText(greeting);
+        await playServerTTS(greeting);
       }
     } catch (err: any) {
       console.error('[Start Call Error]', err);
@@ -403,17 +558,18 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
   };
 
   const endCall = () => {
+    interruptPlayback();
     if (roomRef.current) {
       roomRef.current.disconnect();
       roomRef.current = null;
     }
+    audioElementsRef.current.forEach((el) => el.remove());
+    audioElementsRef.current = [];
+
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch (e) {}
-    }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
     }
     stopAudioAnalysis();
     setState('idle');

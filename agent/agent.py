@@ -16,7 +16,10 @@ from livekit.plugins import deepgram, openai, silero
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 logger = logging.getLogger("suyash-voice-agent")
 
 APP_URL = os.getenv("NEXT_PUBLIC_APP_URL", "http://localhost:3000")
@@ -39,7 +42,7 @@ class SuyashAssistantFunctionContext(llm.FunctionContext):
 
     @llm.ai_callable(description="Search Suyash Singh's verified resume and portfolio knowledge base")
     async def search_profile(self, query: str) -> str:
-        logger.info(f"Retrieving profile for: {query}")
+        logger.info(f"[RETRIEVAL] Searching verified profile for query: {query}")
         try:
             res = requests.post(
                 f"{APP_URL}/api/retrieve",
@@ -49,6 +52,7 @@ class SuyashAssistantFunctionContext(llm.FunctionContext):
             if res.status_code == 200:
                 data = res.json()
                 results = data.get("results", [])
+                logger.info(f"[RETRIEVAL] {len(results)} chunks retrieved")
                 
                 # Publish citation metadata to the LiveKit room data channel
                 citations = [
@@ -71,32 +75,68 @@ class SuyashAssistantFunctionContext(llm.FunctionContext):
                 })
                 
                 await self.room.local_participant.publish_data(payload.encode("utf-8"))
+                logger.info("[CITATION] Published citation metadata over data channel")
                 
                 return json.dumps(results)
+            logger.warn(f"[RETRIEVAL] Non-200 status code: {res.status_code}")
             return "No verified profile chunks found."
         except Exception as e:
-            logger.error(f"Retrieval error: {e}")
+            logger.error(f"[RETRIEVAL] Retrieval error: {e}")
             return "Error retrieving verified profile context."
 
 async def entrypoint(ctx: JobContext):
-    logger.info(f"Connecting to room {ctx.room.name}")
+    logger.info(f"[VOICE] Agent connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     fnc_ctx = SuyashAssistantFunctionContext(ctx.room)
 
+    # Determine STT Provider
+    stt_provider = None
+    if os.getenv("DEEPGRAM_API_KEY"):
+        logger.info("[STT] Initializing Deepgram STT")
+        stt_provider = deepgram.STT()
+    elif os.getenv("OPENAI_API_KEY"):
+        logger.info("[STT] Initializing OpenAI Whisper STT")
+        stt_provider = openai.STT()
+    else:
+        logger.warn("[STT] No dedicated STT key found, attempting default STT")
+        stt_provider = deepgram.STT()
+
+    # Determine LLM Provider
+    llm_provider = openai.LLM(model="gpt-4o-mini")
+    logger.info("[LLM] Initializing OpenAI gpt-4o-mini LLM")
+
+    # Determine TTS Provider
+    tts_voice = os.getenv("TTS_VOICE", "alloy")
+    logger.info(f"[TTS] Initializing OpenAI TTS (model=tts-1, voice={tts_voice})")
+    tts_provider = openai.TTS(model="tts-1", voice=tts_voice)
+
     # Initialize Voice Assistant pipeline
     assistant = VoiceAssistant(
         vad=silero.VAD.load(),
-        stt=deepgram.STT(),
-        llm=openai.LLM(model="gpt-4o-mini"),
-        tts=openai.TTS(voice="alloy"),
+        stt=stt_provider,
+        llm=llm_provider,
+        tts=tts_provider,
         fnc_ctx=fnc_ctx,
         system_message=SYSTEM_PROMPT,
     )
 
-    assistant.start(ctx.room)
+    @assistant.on("user_started_speaking")
+    def on_user_speaking():
+        logger.info("[VOICE] User started speaking (interruption detected)")
 
-    # Welcome message
+    @assistant.on("agent_started_speaking")
+    def on_agent_speaking():
+        logger.info("[VOICE] Agent started speaking (TTS audio publishing)")
+
+    @assistant.on("agent_stopped_speaking")
+    def on_agent_stopped():
+        logger.info("[VOICE] Agent finished speaking")
+
+    assistant.start(ctx.room)
+    logger.info("[AUDIO] Assistant started in room, audio tracks published")
+
+    # Initial spoken greeting
     await assistant.say(
         "Hi! I’m Suyash’s AI digital twin. What would you like to know about his projects, research, or experience?",
         allow_interruptions=True,

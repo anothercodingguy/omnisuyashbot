@@ -58,4 +58,17 @@ describe('API Routes Verification', () => {
     expect(data.participantName).toBe('test-user');
     expect(['livekit_webrtc', 'web_speech_direct']).toContain(data.mode);
   });
+
+  it('POST /api/tts validates input and returns response', async () => {
+    const { POST: ttsPOST } = await import('../app/api/tts/route');
+    const emptyReq = createMockRequest('http://localhost:3000/api/tts', { text: '' });
+    const emptyRes = await ttsPOST(emptyReq);
+    expect(emptyRes.status).toBe(400);
+
+    const validReq = createMockRequest('http://localhost:3000/api/tts', {
+      text: 'PathFlow is an OpenTelemetry-compatible observability platform for AI agents.',
+    });
+    const res = await ttsPOST(validReq);
+    expect([200, 502, 503]).toContain(res.status);
+  });
 });
