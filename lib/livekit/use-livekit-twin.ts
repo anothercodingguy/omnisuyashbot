@@ -46,10 +46,12 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
   const localAnalyserRef = useRef<AnalyserNode | null>(null);
   const remoteAnalyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<any>(null);
   const animFrameRef = useRef<number | null>(null);
   const audioElementsRef = useRef<HTMLMediaElement[]>([]);
+  const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  // Initialize or resume the Web Audio Context for audio analysis
+  // Initialize or resume the Web Audio Context for audio analysis & playback
   const getAudioContext = useCallback(async (): Promise<AudioContext> => {
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -126,10 +128,79 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     setAudioLevel(0);
   };
 
-  // Text Inquiry Handler (Text fallback that shares retrieval & grounded LLM pipeline without browser TTS)
+  // Stops currently playing TTS audio (for interruption handling)
+  const interruptPlayback = useCallback(() => {
+    if (currentAudioSourceRef.current) {
+      try {
+        currentAudioSourceRef.current.stop();
+        currentAudioSourceRef.current.disconnect();
+      } catch (e) {}
+      currentAudioSourceRef.current = null;
+    }
+  }, []);
+
+  // Server-Side Realtime TTS Audio Playback
+  const playServerTTS = useCallback(
+    async (text: string): Promise<void> => {
+      interruptPlayback();
+
+      try {
+        console.log('[TTS] Requesting server-side TTS audio for answer...');
+        const res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+
+        if (res.ok && res.headers.get('Content-Type')?.includes('audio')) {
+          console.log('[TTS] Received binary audio stream from server, decoding...');
+          const arrayBuffer = await res.arrayBuffer();
+          const audioCtx = await getAudioContext();
+          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+          const source = audioCtx.createBufferSource();
+          source.buffer = audioBuffer;
+
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          source.connect(analyser);
+          analyser.connect(audioCtx.destination);
+          remoteAnalyserRef.current = analyser;
+
+          currentAudioSourceRef.current = source;
+          setState('speaking');
+
+          return new Promise<void>((resolve) => {
+            source.onended = () => {
+              console.log('[AUDIO] TTS playback completed');
+              remoteAnalyserRef.current = null;
+              currentAudioSourceRef.current = null;
+              setState('listening');
+              resolve();
+            };
+
+            source.start(0);
+            console.log('[AUDIO] TTS audio playback started through Web Audio API');
+          });
+        } else {
+          // If no cloud TTS key is available, remain in listening state with answer in transcript
+          console.log('[TTS] Server TTS key not configured, answer delivered in transcript.');
+          setState('listening');
+        }
+      } catch (err) {
+        console.warn('[TTS] Server TTS notice:', err);
+        setState('listening');
+      }
+    },
+    [getAudioContext, interruptPlayback]
+  );
+
+  // Core RAG & LLM Message Handler
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
+
+      interruptPlayback();
 
       const userMsg: ChatMessage = {
         id: `user-${Date.now()}`,
@@ -140,6 +211,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
 
       setMessages((prev) => [...prev, userMsg]);
       setInterimTranscript('');
+      setState('thinking');
 
       try {
         const historyPayload = messages.slice(-8).map((m) => ({
@@ -148,7 +220,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
           citedChunkIds: m.citations?.map((c) => c.source_id),
         }));
 
-        console.log(`[QUERY] Sending text inquiry to grounded RAG pipeline: "${text.trim()}"`);
+        console.log(`[QUERY] Sending inquiry to grounded RAG pipeline: "${text.trim()}"`);
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -159,7 +231,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         });
 
         const data = await res.json();
-        console.log(`[LLM] Grounded text response received with ${data.citations?.length || 0} citations`);
+        console.log(`[LLM] Grounded response received with ${data.citations?.length || 0} citations`);
 
         const assistantMsg: ChatMessage = {
           id: `ai-${Date.now()}`,
@@ -170,15 +242,88 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         };
 
         setMessages((prev) => [...prev, assistantMsg]);
+
+        // Attempt server-side TTS audio playback if call is active
+        if (state !== 'idle' && state !== 'ended') {
+          await playServerTTS(assistantMsg.text);
+        } else {
+          setState('idle');
+        }
       } catch (err: any) {
         console.error('[Chat Error]', err);
         setErrorMessage('Failed to receive grounded answer.');
+        setState('listening');
       }
     },
-    [messages]
+    [messages, state, playServerTTS, interruptPlayback]
   );
 
-  // Connects Call: Connects to LiveKit Room, publishes microphone, subscribes to agent audio track
+  // Setup Continuous Speech Recognition for Local Microphone
+  const initSpeechRecognition = useCallback(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      console.warn('SpeechRecognition API not supported in this browser.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      console.log('[STT] Local Speech Recognition started listening...');
+      setState('listening');
+    };
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      let finalStr = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const transcriptPart = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalStr += transcriptPart;
+        } else {
+          interim += transcriptPart;
+        }
+      }
+
+      if (interim) {
+        if (state === 'speaking') {
+          interruptPlayback();
+          setState('listening');
+        }
+        setInterimTranscript(interim);
+      }
+
+      if (finalStr && finalStr.trim().length > 0) {
+        console.log(`[STT] Recognized user utterance: "${finalStr.trim()}"`);
+        setInterimTranscript('');
+        sendMessage(finalStr.trim());
+      }
+    };
+
+    recognition.onerror = (e: any) => {
+      if (e.error !== 'no-speech') {
+        console.warn('[STT] Speech recognition notice:', e.error);
+      }
+    };
+
+    recognition.onend = () => {
+      if (state !== 'idle' && state !== 'ended' && state !== 'error') {
+        try {
+          recognition.start();
+        } catch (e) {}
+      }
+    };
+
+    recognitionRef.current = recognition;
+  }, [sendMessage, state, interruptPlayback]);
+
+  // Connects Call: Connects LiveKit Room + Continuous Speech Recognition
   const startCall = async () => {
     try {
       setState('connecting');
@@ -208,7 +353,36 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         return;
       }
 
-      // 2. Request LiveKit token from backend
+      // 2. Start Realtime Voice Recognition
+      initSpeechRecognition();
+      try {
+        recognitionRef.current?.start();
+      } catch (e) {}
+
+      // Initial Welcome Message
+      const welcomeMsg: ChatMessage = {
+        id: `welcome-${Date.now()}`,
+        sender: 'assistant',
+        text: "Hi! I’m Suyash’s AI digital twin. Speak into your microphone or type below to ask about PathFlow, my research at ICDDS 2025, technical skills, or internships.",
+        citations: [
+          {
+            source_id: 'resume-identity',
+            title: 'Suyash Singh — Identity & Verified Links',
+            section: 'Header / Identity',
+            entity: 'Suyash Singh',
+            page: 1,
+            source: 'Suyash Singh Resume',
+            source_type: 'resume',
+            snippet:
+              'Suyash Singh is a Computer Science Engineering (Data Science) undergraduate at Manipal Institute of Technology (graduating 2027) with a strong foundation in full-stack engineering, distributed systems, AI agent observability, and machine learning pipelines.',
+          },
+        ],
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setMessages((prev) => (prev.length === 0 ? [welcomeMsg] : prev));
+
+      // 3. Request LiveKit token from backend
       let tokenData: any = {};
       try {
         const res = await fetch('/api/livekit/token', {
@@ -223,139 +397,108 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         console.warn('[LiveKit Token Fetch Error]', tokenErr);
       }
 
-      if (!tokenData.token || !tokenData.url) {
-        console.warn('[LiveKit] No LiveKit server credentials returned from token endpoint.');
-        setErrorMessage(
-          'LiveKit Cloud keys not detected in .env.local — asking questions via text with verified citations is active below.'
-        );
+      // 4. Connect to LiveKit Room if credentials available
+      if (tokenData.token && tokenData.url) {
+        try {
+          const room = new Room({
+            adaptiveStream: true,
+            dynacast: true,
+          });
 
-        const welcomeMsg: ChatMessage = {
-          id: `welcome-${Date.now()}`,
-          sender: 'assistant',
-          text: "Hi! I’m Suyash’s AI digital twin. Ask me about PathFlow, my research paper at ICDDS 2025, technical skills, or internships.",
-          citations: [
-            {
-              source_id: 'resume-identity',
-              title: 'Suyash Singh — Identity & Verified Links',
-              section: 'Header / Identity',
-              entity: 'Suyash Singh',
-              page: 1,
-              source: 'Suyash Singh Resume',
-              source_type: 'resume',
-              snippet:
-                'Suyash Singh is a Computer Science Engineering (Data Science) undergraduate at Manipal Institute of Technology (graduating 2027) with a strong foundation in full-stack engineering, distributed systems, AI agent observability, and machine learning pipelines.',
-            },
-          ],
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
+          room.on(RoomEvent.Connected, () => {
+            console.log('[LIVEKIT] Connected to LiveKit Room:', room.name);
+            setState('listening');
+          });
 
-        setMessages((prev) => (prev.length === 0 ? [welcomeMsg] : prev));
-        return;
+          room.on(RoomEvent.Disconnected, () => {
+            console.log('[LIVEKIT] Disconnected from LiveKit Room');
+          });
+
+          // Remote Track Subscription (Plays the LiveKit Agent TTS Audio Track if agent is in room)
+          room.on(
+            RoomEvent.TrackSubscribed,
+            (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+              console.log(`[AUDIO] Remote track subscribed from participant ${participant.identity} (kind: ${track.kind})`);
+              if (track.kind === Track.Kind.Audio) {
+                const audioElement = track.attach();
+                audioElement.id = `remote-audio-${participant.identity}`;
+                audioElement.autoplay = true;
+                audioElementsRef.current.push(audioElement);
+                document.body.appendChild(audioElement);
+
+                if (track.mediaStreamTrack) {
+                  const remoteStream = new MediaStream([track.mediaStreamTrack]);
+                  startRemoteAudioAnalysis(remoteStream);
+                }
+              }
+            }
+          );
+
+          room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+            console.log('[AUDIO] Remote track unsubscribed');
+            track.detach().forEach((el) => el.remove());
+          });
+
+          // Active Speaker Events
+          room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
+            const isAgentSpeaking = speakers.some((p) => p !== room.localParticipant);
+            if (isAgentSpeaking) {
+              setState('speaking');
+            } else if (state === 'speaking') {
+              setState('listening');
+            }
+          });
+
+          // Data Channel Transcripts & Citations published by LiveKit Agent
+          room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
+            try {
+              const str = new TextDecoder().decode(payload);
+              const parsed = JSON.parse(str);
+              if (parsed.type === 'transcript_and_citation') {
+                console.log('[DATA] Received transcript and citation payload from LiveKit Agent');
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: `livekit-${Date.now()}`,
+                    sender: 'assistant',
+                    text: parsed.answer || parsed.query,
+                    citations: parsed.citations,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  },
+                ]);
+              }
+            } catch (e) {
+              console.warn('[LiveKit Data Decode Error]', e);
+            }
+          });
+
+          await room.connect(tokenData.url, tokenData.token);
+          await room.localParticipant.setMicrophoneEnabled(true);
+          roomRef.current = room;
+        } catch (livekitErr) {
+          console.warn('[LiveKit Room Connection Notice]', livekitErr);
+        }
       }
 
-      // 3. Connect to LiveKit Room
-      const room = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-      });
-
-      room.on(RoomEvent.Connected, () => {
-        console.log('[LIVEKIT] Connected to LiveKit Room:', room.name);
-        setState('listening');
-      });
-
-      room.on(RoomEvent.Disconnected, () => {
-        console.log('[LIVEKIT] Disconnected from LiveKit Room');
-        setState('ended');
-        stopAudioAnalysis();
-      });
-
-      room.on(RoomEvent.Reconnecting, () => {
-        console.log('[LIVEKIT] Reconnecting to room...');
-        setState('reconnecting');
-      });
-
-      room.on(RoomEvent.Reconnected, () => {
-        console.log('[LIVEKIT] Reconnected to room');
-        setState('listening');
-      });
-
-      // 4. Remote Track Subscription (Plays the real LiveKit Agent TTS Audio Track)
-      room.on(
-        RoomEvent.TrackSubscribed,
-        (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-          console.log(`[AUDIO] Remote track subscribed from participant ${participant.identity} (kind: ${track.kind})`);
-          if (track.kind === Track.Kind.Audio) {
-            const audioElement = track.attach();
-            audioElement.id = `remote-audio-${participant.identity}`;
-            audioElement.autoplay = true;
-            audioElementsRef.current.push(audioElement);
-            document.body.appendChild(audioElement);
-
-            if (track.mediaStreamTrack) {
-              const remoteStream = new MediaStream([track.mediaStreamTrack]);
-              startRemoteAudioAnalysis(remoteStream);
-            }
-          }
-        }
-      );
-
-      room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
-        console.log('[AUDIO] Remote track unsubscribed');
-        track.detach().forEach((el) => el.remove());
-      });
-
-      // 5. Active Speaker Events (Drives speaking and listening state from real audio activity)
-      room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
-        const isAgentSpeaking = speakers.some((p) => p !== room.localParticipant);
-        if (isAgentSpeaking) {
-          setState('speaking');
-        } else if (state === 'speaking') {
-          setState('listening');
-        }
-      });
-
-      // 6. Data Channel Transcripts & Citations published by LiveKit Agent
-      room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
-        try {
-          const str = new TextDecoder().decode(payload);
-          const parsed = JSON.parse(str);
-          if (parsed.type === 'transcript_and_citation') {
-            console.log('[DATA] Received transcript and citation payload from LiveKit Agent');
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `livekit-${Date.now()}`,
-                sender: 'assistant',
-                text: parsed.answer || parsed.query,
-                citations: parsed.citations,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              },
-            ]);
-          }
-        } catch (e) {
-          console.warn('[LiveKit Data Decode Error]', e);
-        }
-      });
-
-      // 7. Connect Room and publish microphone track
-      await room.connect(tokenData.url, tokenData.token);
-      await room.localParticipant.setMicrophoneEnabled(true);
-      roomRef.current = room;
-
-      console.log('[LIVEKIT] Microphone published to room, listening for LiveKit Agent...');
+      setState('listening');
     } catch (err: any) {
       console.error('[Start Call Error]', err);
-      setErrorMessage('Could not connect to LiveKit voice agent. You can ask questions via text below.');
+      setErrorMessage('Could not initialize voice session. Please try again.');
       setState('error');
       stopAudioAnalysis();
     }
   };
 
   const endCall = () => {
+    interruptPlayback();
     if (roomRef.current) {
       roomRef.current.disconnect();
       roomRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
     }
     audioElementsRef.current.forEach((el) => el.remove());
     audioElementsRef.current = [];
