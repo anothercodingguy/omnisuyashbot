@@ -51,12 +51,16 @@ export default function Home() {
         <div className="max-w-[850px] mx-auto w-full px-6 pt-4 shrink-0">
           <div className="p-3.5 rounded-md bg-[#FFF5F5] border border-[#FED7D7] text-xs text-[#C53030] flex items-center justify-between">
             <div className="space-y-0.5">
-              <span className="font-semibold block">Microphone access required</span>
+              <span className="font-semibold block">
+                {errorMessage.toLowerCase().includes('microphone')
+                  ? 'Microphone access required'
+                  : 'Voice Connection Notice'}
+              </span>
               <span>{errorMessage}</span>
             </div>
             <button
               onClick={handleStartCall}
-              className="px-3 py-1.5 rounded-md bg-[#C53030] text-white text-xs font-medium hover:bg-[#9B2C2C] transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-md bg-[#C53030] text-white text-xs font-medium hover:bg-[#9B2C2C] transition-colors cursor-pointer shrink-0 ml-3"
             >
               Try again
             </button>

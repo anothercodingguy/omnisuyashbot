@@ -261,69 +261,105 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     recognitionRef.current = recognition;
   }, [sendMessage, state]);
 
-  // Connects Call (LiveKit WebRTC or Direct Voice Twin)
+  // Connects Call (LiveKit WebRTC with Seamless Direct Voice Twin Fallback)
   const startCall = async () => {
     try {
       setState('connecting');
       setErrorMessage(null);
 
       // 1. Request microphone permission
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-      startAudioAnalysis(stream);
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+        startAudioAnalysis(stream);
+      } catch (micErr: any) {
+        console.error('[Microphone Permission Error]', micErr);
+        if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+          setErrorMessage(
+            'Microphone access is required for voice conversation. Please allow microphone permissions in your browser and try again.'
+          );
+        } else {
+          setErrorMessage(
+            'Could not access microphone (' + (micErr.message || 'audio device error') + ').'
+          );
+        }
+        setState('error');
+        return;
+      }
 
       // 2. Request token from backend
-      const res = await fetch('/api/livekit/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-
-      const data = await res.json();
-
-      // If LiveKit credentials exist, connect to LiveKit Cloud Room
-      if (data.token && data.url) {
-        isDirectModeRef.current = false;
-        const room = new Room({
-          adaptiveStream: true,
-          dynacast: true,
+      let tokenData: any = {};
+      try {
+        const res = await fetch('/api/livekit/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
         });
+        if (res.ok) {
+          tokenData = await res.json().catch(() => ({}));
+        }
+      } catch (tokenErr) {
+        console.warn('[LiveKit Token Fetch Error]', tokenErr);
+      }
 
-        room.on(RoomEvent.Connected, () => {
-          setState('listening');
-        });
+      let connectedLiveKit = false;
 
-        room.on(RoomEvent.Disconnected, () => {
-          setState('ended');
-          stopAudioAnalysis();
-        });
+      // If LiveKit credentials exist and are reachable, connect to LiveKit Cloud Room
+      if (tokenData.token && tokenData.url) {
+        try {
+          const room = new Room({
+            adaptiveStream: true,
+            dynacast: true,
+          });
 
-        // Listen for real-time citations & transcripts over LiveKit Data Channel
-        room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
-          try {
-            const str = new TextDecoder().decode(payload);
-            const parsed = JSON.parse(str);
-            if (parsed.type === 'transcript_and_citation') {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: `livekit-${Date.now()}`,
-                  sender: 'assistant',
-                  text: parsed.answer,
-                  citations: parsed.citations,
-                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                },
-              ]);
+          room.on(RoomEvent.Connected, () => {
+            setState('listening');
+          });
+
+          room.on(RoomEvent.Disconnected, () => {
+            setState('ended');
+            stopAudioAnalysis();
+          });
+
+          // Listen for real-time citations & transcripts over LiveKit Data Channel
+          room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
+            try {
+              const str = new TextDecoder().decode(payload);
+              const parsed = JSON.parse(str);
+              if (parsed.type === 'transcript_and_citation') {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: `livekit-${Date.now()}`,
+                    sender: 'assistant',
+                    text: parsed.answer,
+                    citations: parsed.citations,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  },
+                ]);
+              }
+            } catch (e) {
+              console.warn('[LiveKit Data Decode Error]', e);
             }
-          } catch (e) {
-            console.warn('[LiveKit Data Decode Error]', e);
-          }
-        });
+          });
 
-        await room.connect(data.url, data.token);
-        await room.localParticipant.setMicrophoneEnabled(true);
-        roomRef.current = room;
-      } else {
+          const connectPromise = room.connect(tokenData.url, tokenData.token);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('LiveKit connection timeout')), 3500)
+          );
+          await Promise.race([connectPromise, timeoutPromise]);
+          await room.localParticipant.setMicrophoneEnabled(true);
+          roomRef.current = room;
+          isDirectModeRef.current = false;
+          connectedLiveKit = true;
+        } catch (livekitErr) {
+          console.warn('[LiveKit WebRTC connect notice, falling back to Direct Voice Mode]', livekitErr);
+          connectedLiveKit = false;
+        }
+      }
+
+      if (!connectedLiveKit) {
         // High-Fidelity Direct Voice Mode
         isDirectModeRef.current = true;
         initSpeechRecognition();
@@ -360,13 +396,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       }
     } catch (err: any) {
       console.error('[Start Call Error]', err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setErrorMessage(
-          'Microphone access is required for voice conversation. Please allow microphone permissions and try again.'
-        );
-      } else {
-        setErrorMessage('Failed to connect to the voice agent. Please try again.');
-      }
+      setErrorMessage('Could not initialize voice session. Please try again.');
       setState('error');
       stopAudioAnalysis();
     }
