@@ -31,7 +31,19 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env*.local
+.env
+.env.production
+.env.development
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
 
 # vercel
 .vercel
