@@ -147,11 +147,12 @@ export function MinimalConversationView({
 
         {/* Real-time Interim User Speech Recognition */}
         {interimTranscript && (
-          <div className="space-y-2 animate-pulse">
-            <div className="text-xs font-semibold text-[var(--accent-green)] tracking-wider uppercase">
-              You (speaking…)
+          <div className="space-y-1.5 p-4 rounded-md bg-[var(--bg-input)] border border-[var(--accent-green)]/30 animate-in fade-in duration-150">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--accent-green)] tracking-wider uppercase">
+              <span className="w-2 h-2 rounded-full bg-[var(--accent-green)] animate-ping" />
+              <span>You (speaking…)</span>
             </div>
-            <div className="text-base sm:text-lg text-[var(--text-secondary)] italic leading-relaxed">
+            <div className="text-base sm:text-lg text-[var(--text-primary)] font-medium leading-relaxed">
               &ldquo;{interimTranscript}&rdquo;
             </div>
           </div>

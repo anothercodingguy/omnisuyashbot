@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Room,
   RoomEvent,
@@ -47,6 +47,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
   const remoteAnalyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
+  const isCallActiveRef = useRef<boolean>(false);
   const animFrameRef = useRef<number | null>(null);
   const audioElementsRef = useRef<HTMLMediaElement[]>([]);
   const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -175,7 +176,9 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
               console.log('[AUDIO] TTS playback completed');
               remoteAnalyserRef.current = null;
               currentAudioSourceRef.current = null;
-              setState('listening');
+              if (isCallActiveRef.current) {
+                setState('listening');
+              }
               resolve();
             };
 
@@ -183,13 +186,16 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
             console.log('[AUDIO] TTS audio playback started through Web Audio API');
           });
         } else {
-          // If no cloud TTS key is available, remain in listening state with answer in transcript
-          console.log('[TTS] Server TTS key not configured, answer delivered in transcript.');
-          setState('listening');
+          console.log('[TTS] Server TTS unavailable, answer displayed in transcript.');
+          if (isCallActiveRef.current) {
+            setState('listening');
+          }
         }
       } catch (err) {
         console.warn('[TTS] Server TTS notice:', err);
-        setState('listening');
+        if (isCallActiveRef.current) {
+          setState('listening');
+        }
       }
     },
     [getAudioContext, interruptPlayback]
@@ -244,7 +250,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         setMessages((prev) => [...prev, assistantMsg]);
 
         // Attempt server-side TTS audio playback if call is active
-        if (state !== 'idle' && state !== 'ended') {
+        if (isCallActiveRef.current) {
           await playServerTTS(assistantMsg.text);
         } else {
           setState('idle');
@@ -252,80 +258,108 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       } catch (err: any) {
         console.error('[Chat Error]', err);
         setErrorMessage('Failed to receive grounded answer.');
-        setState('listening');
+        if (isCallActiveRef.current) {
+          setState('listening');
+        }
       }
     },
-    [messages, state, playServerTTS, interruptPlayback]
+    [messages, playServerTTS, interruptPlayback]
   );
 
-  // Setup Continuous Speech Recognition for Local Microphone
-  const initSpeechRecognition = useCallback(() => {
+  // Continuous Speech Recognition setup with resilient restart loop
+  const startSpeechRecognition = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.warn('SpeechRecognition API not supported in this browser.');
+      console.warn('[STT] Web Speech API not supported in this browser.');
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-
-    recognition.onstart = () => {
-      console.log('[STT] Local Speech Recognition started listening...');
-      setState('listening');
-    };
-
-    recognition.onresult = (event: any) => {
-      let interim = '';
-      let finalStr = '';
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const transcriptPart = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalStr += transcriptPart;
-        } else {
-          interim += transcriptPart;
-        }
-      }
-
-      if (interim) {
-        if (state === 'speaking') {
-          interruptPlayback();
-          setState('listening');
-        }
-        setInterimTranscript(interim);
-      }
-
-      if (finalStr && finalStr.trim().length > 0) {
-        console.log(`[STT] Recognized user utterance: "${finalStr.trim()}"`);
-        setInterimTranscript('');
-        sendMessage(finalStr.trim());
-      }
-    };
-
-    recognition.onerror = (e: any) => {
-      if (e.error !== 'no-speech') {
-        console.warn('[STT] Speech recognition notice:', e.error);
-      }
-    };
-
-    recognition.onend = () => {
-      if (state !== 'idle' && state !== 'ended' && state !== 'error') {
+    try {
+      if (recognitionRef.current) {
         try {
-          recognition.start();
+          recognitionRef.current.abort();
         } catch (e) {}
       }
-    };
 
-    recognitionRef.current = recognition;
-  }, [sendMessage, state, interruptPlayback]);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
 
-  // Connects Call: Connects LiveKit Room + Continuous Speech Recognition
+      recognition.onstart = () => {
+        console.log('[STT] Speech recognition actively listening to microphone...');
+        if (isCallActiveRef.current) {
+          setState('listening');
+        }
+      };
+
+      recognition.onresult = (event: any) => {
+        let currentInterim = '';
+        let finalUtterance = '';
+
+        for (let i = 0; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            finalUtterance += res[0].transcript + ' ';
+          } else {
+            currentInterim += res[0].transcript;
+          }
+        }
+
+        const displayTranscript = (currentInterim || finalUtterance).trim();
+        if (displayTranscript) {
+          setInterimTranscript(displayTranscript);
+        }
+
+        if (finalUtterance && finalUtterance.trim().length > 0) {
+          const cleanedText = finalUtterance.trim();
+          console.log(`[STT] Speech finalized: "${cleanedText}"`);
+          setInterimTranscript('');
+
+          // Restart recognition cleanly for next turn
+          try {
+            recognition.stop();
+          } catch (e) {}
+
+          sendMessage(cleanedText);
+        }
+      };
+
+      recognition.onerror = (e: any) => {
+        if (e.error !== 'no-speech' && e.error !== 'aborted') {
+          console.warn('[STT] Recognition event notice:', e.error);
+        }
+      };
+
+      recognition.onend = () => {
+        // Automatically restart speech recognition while call is active
+        if (isCallActiveRef.current) {
+          setTimeout(() => {
+            if (isCallActiveRef.current) {
+              try {
+                recognition.start();
+              } catch (e) {}
+            }
+          }, 200);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn('[STT] Speech recognition start error:', err);
+    }
+  }, [sendMessage]);
+
+  // Connects Call: Connects LiveKit Room + Continuous Real-time Speech Recognition
   const startCall = async () => {
     try {
+      isCallActiveRef.current = true;
       setState('connecting');
       setErrorMessage(null);
 
@@ -340,6 +374,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         startAudioAnalysis(stream);
       } catch (micErr: any) {
         console.error('[Microphone Permission Error]', micErr);
+        isCallActiveRef.current = false;
         if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
           setErrorMessage(
             'Microphone access is required for voice conversation. Please allow microphone permissions in your browser and try again.'
@@ -354,10 +389,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       }
 
       // 2. Start Realtime Voice Recognition
-      initSpeechRecognition();
-      try {
-        recognitionRef.current?.start();
-      } catch (e) {}
+      startSpeechRecognition();
 
       // Initial Welcome Message
       const welcomeMsg: ChatMessage = {
@@ -483,6 +515,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       setState('listening');
     } catch (err: any) {
       console.error('[Start Call Error]', err);
+      isCallActiveRef.current = false;
       setErrorMessage('Could not initialize voice session. Please try again.');
       setState('error');
       stopAudioAnalysis();
@@ -490,6 +523,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
   };
 
   const endCall = () => {
+    isCallActiveRef.current = false;
     interruptPlayback();
     if (roomRef.current) {
       roomRef.current.disconnect();
@@ -497,8 +531,9 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     }
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch (e) {}
+      recognitionRef.current = null;
     }
     audioElementsRef.current.forEach((el) => el.remove());
     audioElementsRef.current = [];
