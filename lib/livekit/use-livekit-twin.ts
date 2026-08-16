@@ -413,6 +413,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       };
 
       setMessages((prev) => (prev.length === 0 ? [welcomeMsg] : prev));
+      playServerTTS(welcomeMsg.text).catch(() => {});
 
       // 3. Request LiveKit token from backend
       let tokenData: any = {};
