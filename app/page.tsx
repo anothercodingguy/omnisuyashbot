@@ -23,6 +23,7 @@ export default function Home() {
     resetSession,
     toggleMute,
     sendMessage,
+    interruptPlayback,
     openCitation,
     closeCitation,
   } = useLiveKitTwin();
@@ -38,11 +39,10 @@ export default function Home() {
   };
 
   const handlePromptClick = (prompt: string) => {
-    startCall().then(() => {
-      setTimeout(() => {
-        sendMessage(prompt);
-      }, 500);
-    });
+    startCall();
+    setTimeout(() => {
+      sendMessage(prompt);
+    }, 250);
   };
 
   return (
@@ -61,6 +61,7 @@ export default function Home() {
           onReturnToHome={resetSession}
           onSendMessage={sendMessage}
           onSelectCitation={openCitation}
+          onInterrupt={interruptPlayback}
           errorMessage={errorMessage}
         />
       ) : (

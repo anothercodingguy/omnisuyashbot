@@ -376,27 +376,22 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       // 1. Request microphone permission
       let stream: MediaStream | null = null;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
-        startAudioAnalysis(stream);
-      } catch (micErr: any) {
-        console.error('[Microphone Permission Error]', micErr);
-        isCallActiveRef.current = false;
-        if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
-          setErrorMessage(
-            'Microphone access is required for voice conversation. Please allow microphone permissions in your browser and try again.'
-          );
-        } else {
-          setErrorMessage(
-            'Could not access microphone (' + (micErr.message || 'audio device error') + ').'
-          );
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaStreamRef.current = stream;
+          startAudioAnalysis(stream);
         }
-        setState('error');
-        return;
+      } catch (micErr: any) {
+        console.warn('[Microphone Permission Notice]', micErr);
+        // Continue voice mode so user can interact and hear responses
       }
 
-      // 2. Start Realtime Voice Recognition (ready to listen immediately without speaking first)
-      startSpeechRecognition();
+      // 2. Start Realtime Voice Recognition
+      try {
+        startSpeechRecognition();
+      } catch (sttErr) {
+        console.warn('[STT Notice]', sttErr);
+      }
 
       // 3. Request LiveKit token from backend
       let tokenData: any = {};
@@ -570,6 +565,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     resetSession,
     toggleMute,
     sendMessage,
+    interruptPlayback,
     openCitation,
     closeCitation,
   };

@@ -26,6 +26,7 @@ interface ActiveVoiceViewProps {
   onReturnToHome: () => void;
   onSendMessage: (text: string) => void;
   onSelectCitation: (citation: CitationItem) => void;
+  onInterrupt?: () => void;
   errorMessage?: string | null;
 }
 
@@ -39,6 +40,7 @@ export function ActiveVoiceView({
   onRestartCall,
   onReturnToHome,
   onSelectCitation,
+  onInterrupt,
   errorMessage,
 }: ActiveVoiceViewProps) {
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
@@ -73,7 +75,10 @@ export function ActiveVoiceView({
       </header>
 
       {/* ─── 2. Clean Center Hint Text (No chat/text clutter) ─── */}
-      <div className="my-auto text-center space-y-2 z-10 max-w-lg px-4">
+      <div 
+        onClick={() => { if (state === 'speaking') onInterrupt?.(); }}
+        className="my-auto text-center space-y-2 z-10 max-w-lg px-4 cursor-pointer"
+      >
         {isEnded ? (
           <div className="space-y-1">
             <h2 className="text-xl font-normal text-[#E3E3E3]">Conversation ended</h2>
@@ -101,7 +106,10 @@ export function ActiveVoiceView({
       </div>
 
       {/* ─── 3. Full-Width Glowing Aurora Fluid Wave (Bottom Half) ─── */}
-      <div className="w-full max-w-5xl h-[320px] sm:h-[380px] shrink-0 relative z-10">
+      <div 
+        onClick={() => { if (state === 'speaking') onInterrupt?.(); }}
+        className="w-full max-w-5xl h-[320px] sm:h-[380px] shrink-0 relative z-10 cursor-pointer"
+      >
         <LiveFluidWave state={state} audioLevel={audioLevel} />
       </div>
 
