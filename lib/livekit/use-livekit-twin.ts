@@ -28,6 +28,7 @@ interface UseLiveKitTwinReturn {
   resetSession: () => void;
   toggleMute: () => void;
   sendMessage: (text: string) => Promise<void>;
+  interruptPlayback: () => void;
   openCitation: (c: CitationItem) => void;
   closeCitation: () => void;
 }
