@@ -2,7 +2,12 @@ import { ConversationTurn } from './retriever';
 
 export type QueryIntent =
   | 'greeting'
+  | 'acknowledgement'
+  | 'confirmation'
+  | 'farewell'
+  | 'smalltalk'
   | 'identity'
+  | 'conversational_overview'
   | 'profile_overview'
   | 'education'
   | 'skills'
@@ -23,6 +28,7 @@ export interface ClassifiedQuery {
   rawQuery: string;
   normalizedQuery: string;
   intent: QueryIntent;
+  isConversational: boolean;
   detectedEntity: string | null;
   subtopic: string | null;
   expandedKeywords: string[];
@@ -38,6 +44,8 @@ const INJECTION_PATTERNS = [
   'ignore instructions',
   'disregard rules',
   'disregard your instructions',
+  'disregard instructions',
+  'ignore everything',
   'make up',
   'invent a',
   'jailbreak',
@@ -58,6 +66,11 @@ const UNSUPPORTED_TRIGGERS = [
   'favorite sport',
   'favourite sport',
   'favorite player',
+  'favorite song',
+  'how old is',
+  'what is his age',
+  'what is suyash age',
+  'when was he born',
   'girlfriend',
   'boyfriend',
   'salary',
@@ -79,28 +92,34 @@ const UNSUPPORTED_TRIGGERS = [
   'crush',
 ];
 
-const GREETING_PATTERNS = [
-  /^hello[\s!.]*$/i,
-  /^hi[\s!.]*$/i,
-  /^hey[\s!.]*$/i,
-  /^hey there[\s!.]*$/i,
-  /^hi there[\s!.]*$/i,
-  /^good morning[\s!.]*$/i,
-  /^good afternoon[\s!.]*$/i,
-  /^good evening[\s!.]*$/i,
-  /^howdy[\s!.]*$/i,
-  /^yo[\s!.]*$/i,
-  /^greetings[\s!.]*$/i,
-];
+// Conversational Greeting patterns (handles single/multi-word/repeated greetings)
+const GREETING_WORDS = new Set([
+  'hello',
+  'hi',
+  'hey',
+  'howdy',
+  'yo',
+  'greetings',
+  'morning',
+  'afternoon',
+  'evening',
+  'there',
+  'suyash',
+  'bot',
+  'ai',
+]);
 
 /**
- * Classifies a natural language query into an intent and resolves contextual pronouns
+ * Classifies a natural language query into a conversational or factual intent,
+ * with entity detection and context resolution.
  */
 export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []): ClassifiedQuery {
   const normalized = rawQuery
     .toLowerCase()
     .replace(/[’‘]/g, "'")
     .replace(/[“”]/g, '"')
+    .replace(/[.,?!:;]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 
   // 1. Check prompt injection
@@ -109,6 +128,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
       rawQuery,
       normalizedQuery: normalized,
       intent: 'prompt_injection',
+      isConversational: false,
       detectedEntity: null,
       subtopic: null,
       expandedKeywords: [],
@@ -122,6 +142,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
       rawQuery,
       normalizedQuery: normalized,
       intent: 'unsupported',
+      isConversational: false,
       detectedEntity: null,
       subtopic: null,
       expandedKeywords: [],
@@ -129,12 +150,25 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 3. Check greetings
-  if (GREETING_PATTERNS.some((pattern) => pattern.test(normalized))) {
+  // 3. Conversational Router: Greetings (e.g. "hello", "hello hello", "hey there", "hi suyash")
+  const tokens = normalized.split(' ').filter(Boolean);
+  const isPureGreeting =
+    tokens.length > 0 &&
+    tokens.length <= 4 &&
+    tokens.every((t) => GREETING_WORDS.has(t) || t === 'good');
+
+  if (
+    isPureGreeting ||
+    normalized === 'good morning' ||
+    normalized === 'good afternoon' ||
+    normalized === 'good evening' ||
+    normalized === 'good day'
+  ) {
     return {
       rawQuery,
       normalizedQuery: normalized,
       intent: 'greeting',
+      isConversational: true,
       detectedEntity: null,
       subtopic: null,
       expandedKeywords: [],
@@ -142,7 +176,154 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 4. Entity Detection in Current Query or Conversation Context
+  // 4. Conversational Acknowledgements (e.g. "thanks", "thank you", "cool thanks", "thx")
+  if (
+    normalized === 'thanks' ||
+    normalized === 'thank you' ||
+    normalized === 'thank you so much' ||
+    normalized === 'thanks a lot' ||
+    normalized === 'cool thanks' ||
+    normalized === 'thx' ||
+    normalized === 'appreciate it' ||
+    normalized === 'thanks man' ||
+    normalized === 'thanks buddy' ||
+    normalized === 'thank u'
+  ) {
+    return {
+      rawQuery,
+      normalizedQuery: normalized,
+      intent: 'acknowledgement',
+      isConversational: true,
+      detectedEntity: null,
+      subtopic: null,
+      expandedKeywords: [],
+      resolvedContextQuery: rawQuery,
+    };
+  }
+
+  // 5. Conversational Confirmations (e.g. "okay", "cool", "got it", "nice", "awesome", "sure")
+  if (
+    normalized === 'okay' ||
+    normalized === 'ok' ||
+    normalized === 'cool' ||
+    normalized === 'got it' ||
+    normalized === 'nice' ||
+    normalized === 'awesome' ||
+    normalized === 'great' ||
+    normalized === 'sure' ||
+    normalized === 'sounds good' ||
+    normalized === 'perfect' ||
+    normalized === 'understood' ||
+    normalized === 'alright' ||
+    normalized === 'all right' ||
+    normalized === 'thats cool' ||
+    normalized === "that's cool" ||
+    normalized === 'thats interesting' ||
+    normalized === "that's interesting" ||
+    normalized === 'nice one'
+  ) {
+    return {
+      rawQuery,
+      normalizedQuery: normalized,
+      intent: 'confirmation',
+      isConversational: true,
+      detectedEntity: null,
+      subtopic: null,
+      expandedKeywords: [],
+      resolvedContextQuery: rawQuery,
+    };
+  }
+
+  // 6. Conversational Farewells (e.g. "bye", "goodbye", "see you", "cya")
+  if (
+    normalized === 'bye' ||
+    normalized === 'goodbye' ||
+    normalized === 'see you' ||
+    normalized === 'see ya' ||
+    normalized === 'cya' ||
+    normalized === 'have a good day' ||
+    normalized === 'have a great day' ||
+    normalized === 'talk later' ||
+    normalized === 'bye bye' ||
+    normalized === 'catch you later'
+  ) {
+    return {
+      rawQuery,
+      normalizedQuery: normalized,
+      intent: 'farewell',
+      isConversational: true,
+      detectedEntity: null,
+      subtopic: null,
+      expandedKeywords: [],
+      resolvedContextQuery: rawQuery,
+    };
+  }
+
+  // 7. Smalltalk (e.g. "how are you", "how's it going", "what's up")
+  if (
+    normalized === 'how are you' ||
+    normalized === 'how are you doing' ||
+    normalized === 'how is it going' ||
+    normalized === "how's it going" ||
+    normalized === 'hows it going' ||
+    normalized === "what's up" ||
+    normalized === 'whats up' ||
+    normalized === 'how do you do'
+  ) {
+    return {
+      rawQuery,
+      normalizedQuery: normalized,
+      intent: 'smalltalk',
+      isConversational: true,
+      detectedEntity: null,
+      subtopic: null,
+      expandedKeywords: [],
+      resolvedContextQuery: rawQuery,
+    };
+  }
+
+  // 8. Identity / "Who are you?"
+  if (
+    normalized === 'who are you' ||
+    normalized === 'what are you' ||
+    normalized === 'what is your name' ||
+    normalized === 'tell me who you are' ||
+    normalized === 'introduce yourself' ||
+    normalized === 'who is the twin' ||
+    normalized === 'who is this'
+  ) {
+    return {
+      rawQuery,
+      normalizedQuery: normalized,
+      intent: 'identity',
+      isConversational: true,
+      detectedEntity: null,
+      subtopic: null,
+      expandedKeywords: [],
+      resolvedContextQuery: rawQuery,
+    };
+  }
+
+  // 9. "What can you tell me about Suyash?" / Conversational Overview
+  if (
+    normalized.includes('what can you tell me') ||
+    normalized.includes('what do you know about') ||
+    normalized.includes('what topics do you know') ||
+    normalized.includes('what do you know')
+  ) {
+    return {
+      rawQuery,
+      normalizedQuery: normalized,
+      intent: 'conversational_overview',
+      isConversational: false,
+      detectedEntity: null,
+      subtopic: null,
+      expandedKeywords: ['Suyash Singh overview education projects engineering research skills'],
+      resolvedContextQuery: 'Suyash Singh overview education projects engineering research skills',
+    };
+  }
+
+  // 10. Entity Detection in Current Query or Conversation Context
   let detectedEntity: string | null = null;
   let subtopic: string | null = null;
 
@@ -155,7 +336,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     (normalized.includes('gateway') && !normalized.includes('pathflow'))
   ) {
     detectedEntity = 'Semantic LLM Gateway';
-  } else if (normalized.includes('senns') || normalized.includes('self-erasing') || normalized.includes('unlearning')) {
+  } else if (normalized.includes('senns') || normalized.includes('self erasing') || normalized.includes('unlearning')) {
     detectedEntity = 'SENNs';
   } else if (normalized.includes('reachinbox')) {
     detectedEntity = 'ReachInbox';
@@ -202,27 +383,14 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     subtopic = 'caching';
   }
 
-  // 5. Intent Classification
+  // 11. Factual Intent Classification
   let intent: QueryIntent = 'general_query';
   let expandedKeywords: string[] = [];
 
-  // Identity / Digital Twin self-reference
+  // Broad Profile Overview (e.g. "What does he do?", "What does Suyash do?", "Tell me about his background")
   if (
-    normalized.includes('who are you') ||
-    normalized.includes('what are you') ||
-    normalized.includes('what is your profile') ||
-    normalized.includes('tell me about yourself') ||
-    normalized.includes('who is the twin')
-  ) {
-    intent = 'identity';
-    expandedKeywords = ['Suyash Singh identity AI digital twin background profile'];
-  }
-  // Broad Profile Overview (CRITICAL FIX)
-  else if (
     normalized === 'what does he do' ||
-    normalized === 'what does he do?' ||
     normalized === 'what does suyash do' ||
-    normalized === 'what does suyash do?' ||
     normalized.includes('what kind of engineer') ||
     normalized.includes('tell me about suyash') ||
     normalized.includes('tell me about his background') ||
@@ -286,6 +454,8 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     normalized.includes('study') ||
     normalized.includes('studies') ||
     normalized.includes('studying') ||
+    normalized.includes('what does he study') ||
+    normalized.includes('what does suyash study') ||
     normalized.includes('college') ||
     normalized.includes('university') ||
     normalized.includes('degree') ||
@@ -303,6 +473,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     normalized.includes('intern') ||
     normalized.includes('work experience') ||
     normalized.includes('where has he worked') ||
+    normalized.includes('where did he work') ||
     normalized.includes('professional experience') ||
     normalized.includes('job') ||
     normalized.includes('stealth') ||
@@ -314,6 +485,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
   // Projects General
   else if (
     normalized.includes('what has he built') ||
+    normalized.includes('what projects has he worked on') ||
     normalized.includes('what projects') ||
     normalized.includes('tell me about his projects') ||
     normalized.includes('built') ||
@@ -328,6 +500,8 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     normalized.includes('technolog') ||
     normalized.includes('tech stack') ||
     normalized.includes('what does he use') ||
+    normalized.includes('what technologies does he use') ||
+    normalized.includes('what technologies does he know') ||
     normalized.includes('programming languages') ||
     normalized.includes('frameworks') ||
     normalized.includes('tools') ||
@@ -386,6 +560,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     rawQuery,
     normalizedQuery: normalized,
     intent,
+    isConversational: false,
     detectedEntity,
     subtopic,
     expandedKeywords,

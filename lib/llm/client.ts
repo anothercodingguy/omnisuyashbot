@@ -16,29 +16,76 @@ export async function generateGroundedAnswer(
 
   // 1. Retrieve relevant verified profile chunks and classify intent
   const { results: retrievedChunks, queryUsed, classification } = searchProfile(query, history, 6);
-  const { intent, detectedEntity, subtopic } = classification;
+  const { intent, isConversational, detectedEntity, subtopic } = classification;
 
   // 2. Internal Diagnostic Decision Logging
-  console.log(`[RETRIEVAL] ──────────────────────────────────────────`);
-  console.log(`[RETRIEVAL] Query: "${query}"`);
-  console.log(`[RETRIEVAL] Intent: ${intent} | Entity: ${detectedEntity || 'none'} | Subtopic: ${subtopic || 'none'}`);
-  console.log(`[RETRIEVAL] Expanded: "${queryUsed}"`);
-  console.log(`[RETRIEVAL] Retrieved ${retrievedChunks.length} chunks: [${retrievedChunks.map((c) => c.id).join(', ')}]`);
+  console.log(`[CONVERSATION-ROUTER] ──────────────────────────────────────────`);
+  console.log(`[CONVERSATION-ROUTER] Query: "${query}"`);
+  console.log(`[CONVERSATION-ROUTER] Intent: ${intent} | Conversational: ${isConversational} | Entity: ${detectedEntity || 'none'}`);
+  console.log(`[CONVERSATION-ROUTER] Retrieved ${retrievedChunks.length} chunks: [${retrievedChunks.map((c) => c.id).join(', ')}]`);
 
-  // 3. Fast-path: Casual Conversational Greetings
+  // 3. Conversational Router: Greetings (e.g. "hello", "hello hello", "hey there")
   if (intent === 'greeting') {
-    console.log(`[RETRIEVAL] Fast-path greeting returned (no citations required)`);
     return {
-      answer: "Hey! I’m Suyash’s AI digital twin. What would you like to know about his projects, engineering experience, or research?",
+      answer: "Hey! What would you like to know about Suyash?",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
     };
   }
 
-  // 4. Prompt Injection Defense
+  // 4. Conversational Router: Acknowledgements (e.g. "thanks", "cool thanks", "thank you")
+  if (intent === 'acknowledgement') {
+    return {
+      answer: "Of course!",
+      citations: [],
+      grounded: true,
+      retrieved_chunk_ids: [],
+    };
+  }
+
+  // 5. Conversational Router: Confirmations (e.g. "okay", "cool", "got it", "nice")
+  if (intent === 'confirmation') {
+    return {
+      answer: "Sure! Let me know if you want to explore any other projects or details.",
+      citations: [],
+      grounded: true,
+      retrieved_chunk_ids: [],
+    };
+  }
+
+  // 6. Conversational Router: Farewells (e.g. "bye", "see you", "goodbye")
+  if (intent === 'farewell') {
+    return {
+      answer: "See you! Have a great day.",
+      citations: [],
+      grounded: true,
+      retrieved_chunk_ids: [],
+    };
+  }
+
+  // 7. Conversational Router: Smalltalk (e.g. "how are you", "how's it going")
+  if (intent === 'smalltalk') {
+    return {
+      answer: "Doing great! What would you like to know about Suyash?",
+      citations: [],
+      grounded: true,
+      retrieved_chunk_ids: [],
+    };
+  }
+
+  // 8. Conversational Router: Identity (e.g. "who are you?")
+  if (intent === 'identity') {
+    return {
+      answer: "I’m Suyash’s AI digital twin. You can ask me about his projects, engineering work, research, and technical background.",
+      citations: [],
+      grounded: true,
+      retrieved_chunk_ids: [],
+    };
+  }
+
+  // 9. Prompt Injection Defense
   if (intent === 'prompt_injection') {
-    console.log(`[RETRIEVAL] Prompt injection detected and blocked`);
     return {
       answer: "I am strictly grounded in Suyash's verified technical profile. I cannot fabricate personal details, salary, or unverified claims.",
       citations: [],
@@ -47,30 +94,35 @@ export async function generateGroundedAnswer(
     };
   }
 
-  // 5. Unsupported Personal Trivia Defense
+  // 10. Unsupported Personal Trivia Defense (Natural conversational refusal)
   if (intent === 'unsupported') {
-    console.log(`[RETRIEVAL] Unsupported trivia detected (grounded fallback returned)`);
     return {
-      answer: "I don't have verified information in Suyash's available profile sources to answer that. As his AI twin, I can discuss his projects like PathFlow, research at ICDDS 2025, technical stack, internships, and leadership.",
+      answer: "I don't have verified information about that, so I don't want to guess. Ask me anything about Suyash’s work, projects, or experience.",
       citations: [],
       grounded: false,
       retrieved_chunk_ids: [],
     };
   }
 
-  // 6. Identity / Digital Twin self-explanation
-  if (intent === 'identity') {
-    const identityChunk = retrievedChunks.find((c) => c.id === 'resume-identity') || KNOWLEDGE_BASE[0];
-    const citations = validateCitations(['resume-identity'], [identityChunk, ...retrievedChunks]);
+  // 11. Conversational Overview ("What can you tell me about Suyash?")
+  if (intent === 'conversational_overview') {
+    const citedIds = [
+      'resume-identity',
+      'resume-education',
+      'resume-project-pathflow',
+      'resume-project-senns',
+      'resume-experience-stealth',
+    ];
+    const availableCitations = validateCitations(citedIds, retrievedChunks.length > 0 ? retrievedChunks : KNOWLEDGE_BASE);
     return {
-      answer: "I’m Suyash’s AI digital twin. I can tell you about his projects (like PathFlow and the Semantic LLM Gateway), engineering experience at a Stealth Startup and IEEE, machine unlearning research at ICDDS 2025, education at Manipal, and core technical skills.",
-      citations,
+      answer: "I can tell you about Suyash’s education, projects, engineering experience, research, and technical skills. He’s worked across AI systems, backend engineering, distributed systems, and machine unlearning.",
+      citations: availableCitations,
       grounded: true,
-      retrieved_chunk_ids: ['resume-identity'],
+      retrieved_chunk_ids: citedIds,
     };
   }
 
-  // 7. Try External LLM APIs (Groq -> OpenAI -> Gemini) if keys exist
+  // 12. Try External LLM APIs (Groq -> OpenAI -> Gemini) if keys exist for complex natural queries
   const groqKey = process.env.GROQ_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -79,7 +131,7 @@ export async function generateGroundedAnswer(
     try {
       const response = await callGroq(query, retrievedChunks, history, groqKey);
       if (response && response.grounded) {
-        console.log(`[RETRIEVAL] Groq returned grounded answer with ${response.citations.length} citations`);
+        console.log(`[LLM] Groq returned grounded answer with ${response.citations.length} citations`);
         return response;
       }
     } catch (e) {
@@ -91,7 +143,7 @@ export async function generateGroundedAnswer(
     try {
       const response = await callOpenAI(query, retrievedChunks, history, openaiKey);
       if (response && response.grounded) {
-        console.log(`[RETRIEVAL] OpenAI returned grounded answer with ${response.citations.length} citations`);
+        console.log(`[LLM] OpenAI returned grounded answer with ${response.citations.length} citations`);
         return response;
       }
     } catch (e) {
@@ -103,7 +155,7 @@ export async function generateGroundedAnswer(
     try {
       const response = await callGemini(query, retrievedChunks, history, geminiKey);
       if (response && response.grounded) {
-        console.log(`[RETRIEVAL] Gemini returned grounded answer with ${response.citations.length} citations`);
+        console.log(`[LLM] Gemini returned grounded answer with ${response.citations.length} citations`);
         return response;
       }
     } catch (e) {
@@ -111,15 +163,8 @@ export async function generateGroundedAnswer(
     }
   }
 
-  // 8. Deterministic High-Fidelity Grounded Engine (100% Reliability & Zero Failure Rate)
-  const deterministicResponse = generateDeterministicGroundedResponse(
-    query,
-    retrievedChunks,
-    history,
-    classification
-  );
-  console.log(`[RETRIEVAL] Deterministic engine generated response with ${deterministicResponse.citations.length} citations`);
-  return deterministicResponse;
+  // 13. Deterministic Grounded Engine (100% Reliable, Crisp & Concise for Voice)
+  return generateDeterministicGroundedResponse(query, retrievedChunks, history, classification);
 }
 
 async function callGroq(
@@ -222,9 +267,7 @@ async function callGemini(
       body: JSON.stringify({
         contents: [
           {
-            parts: [
-              { text: `${SYSTEM_GROUNDING_PROMPT}\n\n${userPrompt}` },
-            ],
+            parts: [{ text: `${SYSTEM_GROUNDING_PROMPT}\n\n${userPrompt}` }],
           },
         ],
         generationConfig: {
@@ -252,7 +295,7 @@ async function callGemini(
 }
 
 /**
- * Deterministic Grounded Engine ensuring zero failure rate and complete factual fidelity
+ * Deterministic Grounded Engine ensuring concise, voice-optimized natural responses
  */
 function generateDeterministicGroundedResponse(
   query: string,
@@ -263,7 +306,7 @@ function generateDeterministicGroundedResponse(
   const { intent, subtopic } = classification;
   const qLower = query.toLowerCase().replace(/[’‘]/g, "'");
 
-  // 1. Broad Profile Overview Intent (Handles "What does he do?", "Tell me about his background", etc.)
+  // 1. Broad Profile Overview Intent (e.g. "What does he do?", "Tell me about his background")
   if (intent === 'profile_overview') {
     const citedIds = [
       'resume-identity',
@@ -272,18 +315,18 @@ function generateDeterministicGroundedResponse(
       'resume-project-senns',
       'resume-experience-stealth',
     ];
-    const availableCitations = validateCitations(citedIds, retrievedChunks);
+    const availableCitations = validateCitations(citedIds, retrievedChunks.length > 0 ? retrievedChunks : KNOWLEDGE_BASE);
 
     return {
       answer:
-        "Suyash is a Computer Science Engineering student at Manipal Institute of Technology (Data Science, graduating 2027) focused on software engineering, AI systems, and backend infrastructure. His technical work includes PathFlow (observability platform for AI agent fleets) and the Semantic LLM Gateway, co-authored machine unlearning research accepted at ICDDS 2025 (SENNs), and industry experience building scalable AWS inference pipelines at a Stealth Startup.",
-      citations: availableCitations.length > 0 ? availableCitations : validateCitations(citedIds, KNOWLEDGE_BASE),
+        "Suyash is a Computer Science student at Manipal Institute of Technology focused on software engineering, AI systems, and backend infrastructure. He has built projects including PathFlow and the Semantic LLM Gateway, published machine unlearning research at ICDDS 2025, and has experience building distributed AWS inference pipelines at a Stealth Startup.",
+      citations: availableCitations,
       grounded: true,
-      retrieved_chunk_ids: retrievedChunks.map((c) => c.id),
+      retrieved_chunk_ids: citedIds,
     };
   }
 
-  // 2. Education Intent
+  // 2. Education Intent ("What does he study?", "Where does he study?")
   if (intent === 'education') {
     const eduChunk =
       retrievedChunks.find((c) => c.id === 'resume-education') ||
@@ -298,7 +341,7 @@ function generateDeterministicGroundedResponse(
     };
   }
 
-  // 3. Work Experience / Internships Intent
+  // 3. Work Experience / Internships Intent ("Where has he worked?", "Tell me about his internships")
   if (intent === 'work_experience') {
     const targetChunks =
       retrievedChunks.filter((c) => c.category === 'experience').length > 0
@@ -310,7 +353,7 @@ function generateDeterministicGroundedResponse(
     );
     return {
       answer:
-        "Suyash's industry experience includes working as an AI Intern at a Stealth Startup building scalable AWS distributed inference pipelines and state-machine logic (Dec 2025 – May 2026), and as an R&D Intern at IEEE Computer Society Bangalore Chapter evaluating distributed architectures (Apr 2025 – Sept 2025).",
+        "Suyash worked as an AI Intern at a Stealth Startup building scalable AWS distributed inference pipelines and state machines (Dec 2025 – May 2026), and as an R&D Intern at IEEE Computer Society Bangalore Chapter evaluating distributed architectures (Apr 2025 – Sept 2025).",
       citations: expCitations,
       grounded: true,
       retrieved_chunk_ids: targetChunks.map((c) => c.id),
@@ -327,7 +370,7 @@ function generateDeterministicGroundedResponse(
     if (subtopic === 'visualization' || qLower.includes('visualiz') || qLower.includes('tree') || qLower.includes('dag')) {
       return {
         answer:
-          "For visualization in PathFlow, Suyash built an interactive DAG visualizer using React Flow to inspect multi-step agent execution trees, sub-span latencies, and tool-routing decisions in real time.",
+          "He used React Flow for PathFlow's interactive DAG visualization to inspect multi-step agent execution trees and sub-span latencies in real time.",
         citations: pathCitations,
         grounded: true,
         retrieved_chunk_ids: ['resume-project-pathflow'],
@@ -344,14 +387,14 @@ function generateDeterministicGroundedResponse(
     }
     return {
       answer:
-        "PathFlow is Suyash's OpenTelemetry-compatible observability platform for autonomous AI agent fleets, described as 'Strava for AI Agents.' It tracks execution paths, token velocity, context volume, and API compute costs, with a React Flow DAG visualizer and multi-factor agent benchmarking.",
+        "PathFlow is Suyash's OpenTelemetry-compatible observability platform for autonomous AI agent fleets, described as 'Strava for AI Agents.' It tracks execution paths, token velocity, context volume, and API compute costs, with a React Flow DAG visualizer.",
       citations: pathCitations,
       grounded: true,
       retrieved_chunk_ids: ['resume-project-pathflow'],
     };
   }
 
-  // 5. Semantic LLM Gateway Intent
+  // 5. Semantic LLM Gateway Intent ("What is the Semantic LLM Gateway?")
   if (intent === 'semantic_gateway') {
     const semChunk =
       retrievedChunks.find((c) => c.id === 'resume-project-semantic-llm') ||
@@ -366,7 +409,7 @@ function generateDeterministicGroundedResponse(
     };
   }
 
-  // 6. Research / SENNs Intent
+  // 6. Research / SENNs Intent ("What is SENNs?", "Tell me about his research")
   if (intent === 'research') {
     const sennChunk =
       retrievedChunks.find((c) => c.id === 'resume-project-senns') ||
@@ -374,7 +417,7 @@ function generateDeterministicGroundedResponse(
     const sennCitations = validateCitations(['resume-project-senns'], [sennChunk, ...retrievedChunks]);
     return {
       answer:
-        "SENNs (Self-Erasing Neural Networks) is a peer-reviewed research publication accepted at the ICDDS 2025 international conference. Suyash co-authored this algorithmic framework for GDPR-compliant machine unlearning, developing diagnostic pipelines in Python and PyTorch to evaluate weight shifts and accuracy trade-offs.",
+        "SENNs (Self-Erasing Neural Networks) is a peer-reviewed research publication accepted at the ICDDS 2025 international conference. Suyash co-authored this algorithmic framework for GDPR-compliant machine unlearning, developing diagnostic pipelines in Python and PyTorch.",
       citations: sennCitations,
       grounded: true,
       retrieved_chunk_ids: ['resume-project-senns'],
@@ -389,14 +432,14 @@ function generateDeterministicGroundedResponse(
     const reachCitations = validateCitations(['resume-project-reachinbox'], [reachChunk, ...retrievedChunks]);
     return {
       answer:
-        "ReachInbox is a highly concurrent email scheduling system built with TypeScript, Next.js, Node.js, and Redis, ensuring reliable asynchronous task execution across distributed queues with responsive interfaces.",
+        "ReachInbox is a highly concurrent email scheduling system built with TypeScript, Next.js, Node.js, and Redis, ensuring reliable asynchronous task execution across distributed queues.",
       citations: reachCitations,
       grounded: true,
       retrieved_chunk_ids: ['resume-project-reachinbox'],
     };
   }
 
-  // 8. Projects General Intent
+  // 8. Projects General Intent ("What has he built?", "What projects has he worked on?")
   if (intent === 'projects') {
     const projectChunks = KNOWLEDGE_BASE.filter((c) => c.category === 'project');
     const projectCitations = validateCitations(
@@ -405,14 +448,14 @@ function generateDeterministicGroundedResponse(
     );
     return {
       answer:
-        "Suyash has built several key projects: PathFlow (an OpenTelemetry observability platform for AI agent fleets with React Flow DAG visualization), the Semantic LLM Gateway (a low-latency FastAPI proxy with Qdrant caching under 50ms), ReachInbox (a concurrent distributed email scheduler), and SENNs (peer-reviewed research in machine unlearning accepted at ICDDS 2025).",
+        "Suyash has built several key projects: PathFlow (an OpenTelemetry observability platform for AI agent fleets), the Semantic LLM Gateway (a low-latency FastAPI proxy with Qdrant caching under 50ms), ReachInbox (a concurrent distributed email scheduler), and SENNs (peer-reviewed research in machine unlearning accepted at ICDDS 2025).",
       citations: projectCitations,
       grounded: true,
       retrieved_chunk_ids: projectChunks.map((c) => c.id),
     };
   }
 
-  // 9. Technical Skills Intent
+  // 9. Technical Skills Intent ("What technologies does he know?", "What is his tech stack?")
   if (intent === 'skills') {
     const skillChunks = KNOWLEDGE_BASE.filter((c) => c.category === 'skills');
     const skillCitations = validateCitations(
@@ -479,7 +522,7 @@ function generateDeterministicGroundedResponse(
     const citations = validateCitations([primary.id], retrievedChunks);
     return {
       answer:
-        "Suyash Singh is a full-stack and systems engineer specializing in AI agent observability (PathFlow), low-latency AI proxies, and distributed inference. He combines rigorous CS fundamentals (8.51 CGPA at Manipal, Codeforces Pupil) with production backend engineering on AWS and published machine unlearning research at ICDDS 2025.",
+        "Suyash Singh is a Computer Science student and systems engineer specializing in AI agent observability (PathFlow), low-latency AI proxies, and distributed inference. He combines strong CS fundamentals (8.51 CGPA at Manipal, Codeforces Pupil) with production backend engineering on AWS and published machine unlearning research at ICDDS 2025.",
       citations,
       grounded: true,
       retrieved_chunk_ids: [primary.id],
@@ -488,7 +531,7 @@ function generateDeterministicGroundedResponse(
 
   return {
     answer:
-      "I don't have enough verified information in Suyash's available profile sources to answer that accurately.",
+      "I don't have verified information about that, so I don't want to guess. Ask me anything about Suyash’s work, projects, or experience.",
     citations: [],
     grounded: false,
     retrieved_chunk_ids: [],

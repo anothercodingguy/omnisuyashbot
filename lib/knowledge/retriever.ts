@@ -205,8 +205,12 @@ export function searchProfile(
   const qLower = resolvedContextQuery.toLowerCase();
   const queryTokens = tokenize(resolvedContextQuery);
 
-  // 1. Fast path for Greeting, Unsupported Trivia & Injections
-  if (intent === 'greeting' || intent === 'unsupported' || intent === 'prompt_injection') {
+  // 1. Fast path for Conversational Intents (greetings, smalltalk, acknowledgements, farewells, identity, unsupported, injections)
+  if (
+    classification.isConversational ||
+    intent === 'unsupported' ||
+    intent === 'prompt_injection'
+  ) {
     return {
       results: [],
       allMatches: [],
@@ -215,8 +219,8 @@ export function searchProfile(
     };
   }
 
-  // 2. Multi-domain Chunks for Broad Profile Overview
-  if (intent === 'profile_overview' || intent === 'identity') {
+  // 2. Multi-domain Chunks for Broad Profile Overview & "What can you tell me"
+  if (intent === 'profile_overview' || intent === 'conversational_overview') {
     const overviewIds = [
       'resume-identity',
       'resume-education',
