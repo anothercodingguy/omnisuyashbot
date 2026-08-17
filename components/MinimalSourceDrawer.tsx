@@ -17,6 +17,17 @@ export function MinimalSourceDrawer({
 }: MinimalSourceDrawerProps) {
   const [copied, setCopied] = React.useState(false);
 
+  // Close on Escape key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !citation) return null;
 
   const handleCopy = () => {
@@ -28,12 +39,12 @@ export function MinimalSourceDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/40 backdrop-blur-[1px] transition-opacity">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
       {/* Backdrop click to close */}
-      <div className="absolute inset-0" onClick={onClose} />
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
       {/* Document-like plain side sheet */}
-      <div className="relative w-full max-w-md h-full bg-[var(--bg-surface)] border-l border-[var(--line)] p-8 flex flex-col justify-between shadow-2xl overflow-y-auto font-sans text-[var(--text-primary)]">
+      <div className="relative w-full max-w-md h-full bg-[var(--bg-surface)] border-l border-[var(--line)] p-6 sm:p-8 flex flex-col justify-between shadow-2xl overflow-y-auto font-sans text-[var(--text-primary)] animate-in slide-in-from-right duration-250">
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-[var(--line)]">

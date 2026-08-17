@@ -25,6 +25,7 @@ interface UseLiveKitTwinReturn {
   errorMessage: string | null;
   startCall: () => Promise<void>;
   endCall: () => void;
+  resetSession: () => void;
   toggleMute: () => void;
   sendMessage: (text: string) => Promise<void>;
   openCitation: (c: CitationItem) => void;
@@ -313,6 +314,11 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
 
         const displayTranscript = (currentInterim || finalUtterance).trim();
         if (displayTranscript) {
+          // Interrupt any currently playing AI voice audio immediately
+          interruptPlayback();
+          if (isCallActiveRef.current && state === 'speaking') {
+            setState('listening');
+          }
           setInterimTranscript(displayTranscript);
         }
 
@@ -320,6 +326,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
           const cleanedText = finalUtterance.trim();
           console.log(`[STT] Speech finalized: "${cleanedText}"`);
           setInterimTranscript('');
+          interruptPlayback();
 
           // Restart recognition cleanly for next turn
           try {
@@ -388,32 +395,8 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         return;
       }
 
-      // 2. Start Realtime Voice Recognition
+      // 2. Start Realtime Voice Recognition (ready to listen immediately without speaking first)
       startSpeechRecognition();
-
-      // Initial Welcome Message
-      const welcomeMsg: ChatMessage = {
-        id: `welcome-${Date.now()}`,
-        sender: 'assistant',
-        text: "Hi! I’m Suyash’s AI digital twin. Speak into your microphone or type below to ask about PathFlow, my research at ICDDS 2025, technical skills, or internships.",
-        citations: [
-          {
-            source_id: 'resume-identity',
-            title: 'Suyash Singh — Identity & Verified Links',
-            section: 'Header / Identity',
-            entity: 'Suyash Singh',
-            page: 1,
-            source: 'Suyash Singh Resume',
-            source_type: 'resume',
-            snippet:
-              'Suyash Singh is a Computer Science Engineering (Data Science) undergraduate at Manipal Institute of Technology (graduating 2027) with a strong foundation in full-stack engineering, distributed systems, AI agent observability, and machine learning pipelines.',
-          },
-        ],
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setMessages((prev) => (prev.length === 0 ? [welcomeMsg] : prev));
-      playServerTTS(welcomeMsg.text).catch(() => {});
 
       // 3. Request LiveKit token from backend
       let tokenData: any = {};
@@ -540,8 +523,15 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     audioElementsRef.current = [];
 
     stopAudioAnalysis();
-    setState('idle');
+    setState('ended');
     setInterimTranscript('');
+  };
+
+  const resetSession = () => {
+    endCall();
+    setMessages([]);
+    setErrorMessage(null);
+    setState('idle');
   };
 
   const toggleMute = () => {
@@ -577,6 +567,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     errorMessage,
     startCall,
     endCall,
+    resetSession,
     toggleMute,
     sendMessage,
     openCitation,

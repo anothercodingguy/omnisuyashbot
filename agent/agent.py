@@ -102,13 +102,22 @@ async def entrypoint(ctx: JobContext):
         logger.warn("[STT] No dedicated STT key found, attempting default STT")
         stt_provider = deepgram.STT()
 
-    # Determine LLM Provider
-    llm_provider = openai.LLM(model="gpt-4o-mini")
-    logger.info("[LLM] Initializing OpenAI gpt-4o-mini LLM")
+    # Determine LLM Provider (Groq -> OpenAI)
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if groq_api_key:
+        logger.info("[LLM] Initializing Groq LLM (llama-3.3-70b-versatile via Groq API)")
+        llm_provider = openai.LLM(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=groq_api_key,
+            model="llama-3.3-70b-versatile",
+        )
+    else:
+        logger.info("[LLM] Initializing OpenAI gpt-4o-mini LLM")
+        llm_provider = openai.LLM(model="gpt-4o-mini")
 
-    # Determine TTS Provider
+    # Determine TTS Provider (LiveKit Agent TTS -> Audio Track)
     tts_voice = os.getenv("TTS_VOICE", "alloy")
-    logger.info(f"[TTS] Initializing OpenAI TTS (model=tts-1, voice={tts_voice})")
+    logger.info(f"[TTS] Initializing LiveKit Agent TTS (model=tts-1, voice={tts_voice})")
     tts_provider = openai.TTS(model="tts-1", voice=tts_voice)
 
     # Initialize Voice Assistant pipeline
@@ -134,13 +143,7 @@ async def entrypoint(ctx: JobContext):
         logger.info("[VOICE] Agent finished speaking")
 
     assistant.start(ctx.room)
-    logger.info("[AUDIO] Assistant started in room, audio tracks published")
-
-    # Initial spoken greeting
-    await assistant.say(
-        "Hi! I’m Suyash’s AI digital twin. What would you like to know about his projects, research, or experience?",
-        allow_interruptions=True,
-    )
+    logger.info("[AUDIO] Assistant started in room, audio tracks published and listening")
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

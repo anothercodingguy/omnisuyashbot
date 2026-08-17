@@ -1,35 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #FAFAF9;
-  --bg-surface: #FFFFFF;
-  --bg-input: #FFFFFF;
-  --text-primary: #111111;
-  --text-secondary: #6B6B6B;
-  --text-muted: #8A8A8A;
-  --line: #E8E8E6;
-  --line-hover: #D4D4D4;
-  --btn-bg: #111111;
-  --btn-text: #FFFFFF;
-  --btn-hover: #2A2A2A;
-  --accent-green: #16A34A;
-  --selection: #EAEAEA;
+  --bg: #131314;
+  --bg-surface: #1E1F20;
+  --bg-input: #1E1F20;
+  --bg-pill: #282A2C;
+  --text-primary: #E3E3E3;
+  --text-secondary: #9E9E9E;
+  --text-muted: #666666;
+  --line: #2E2F32;
+  --line-hover: #3E4044;
+  --btn-bg: #E3E3E3;
+  --btn-text: #131314;
+  --btn-hover: #FFFFFF;
+  --accent-blue: #8AB4F8;
+  --accent-purple: #C58AF9;
+  --accent-coral: #F28B82;
+  --accent-green: #34A853;
+  --selection: #2A2B2E;
 }
 
 .dark {
-  --bg: #0C0C0C;
-  --bg-surface: #141414;
-  --bg-input: #171717;
-  --text-primary: #F0F0F0;
+  --bg: #131314;
+  --bg-surface: #1E1F20;
+  --bg-input: #1E1F20;
+  --bg-pill: #282A2C;
+  --text-primary: #E3E3E3;
   --text-secondary: #9E9E9E;
   --text-muted: #666666;
-  --line: #222222;
-  --line-hover: #333333;
-  --btn-bg: #F0F0F0;
-  --btn-text: #0C0C0C;
+  --line: #2E2F32;
+  --line-hover: #3E4044;
+  --btn-bg: #E3E3E3;
+  --btn-text: #131314;
   --btn-hover: #FFFFFF;
-  --accent-green: #22C55E;
-  --selection: #2A2A2A;
+  --accent-blue: #8AB4F8;
+  --accent-purple: #C58AF9;
+  --accent-coral: #F28B82;
+  --accent-green: #34A853;
+  --selection: #2A2B2E;
 }
 
 * {
@@ -38,35 +46,42 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: dark;
+  background-color: #131314;
 }
 
 body {
-  background-color: var(--bg);
-  color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #131314;
+  color: #E3E3E3;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Google Sans", "Helvetica Neue", Arial, sans-serif;
   min-height: 100vh;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Subtle Quiet Pulse for Voice State */
-@keyframes subtlePulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.15);
-  }
+/* Subtle Waveform Animation */
+@keyframes liveWaveform {
+  0%, 100% { height: 6px; }
+  50% { height: 16px; }
 }
 
-.animate-subtle-pulse {
-  animation: subtlePulse 2s ease-in-out infinite;
+.animate-live-wave-1 {
+  animation: liveWaveform 0.8s ease-in-out infinite;
+}
+
+.animate-live-wave-2 {
+  animation: liveWaveform 0.8s ease-in-out 0.2s infinite;
+}
+
+.animate-live-wave-3 {
+  animation: liveWaveform 0.8s ease-in-out 0.4s infinite;
+}
+
+.animate-live-wave-4 {
+  animation: liveWaveform 0.8s ease-in-out 0.1s infinite;
 }
 
 /* Custom Minimal Scrollbar */
@@ -80,18 +95,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #E0E0E0;
+  background: #2E2F32;
   border-radius: 2px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #333333;
-}
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #C0C0C0;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #444444;
+  background: #3E4044;
 }

@@ -1,61 +1,50 @@
 'use client';
 
 import React from 'react';
-import { ArrowUpRight, Sun, Moon } from 'lucide-react';
-import { useTheme } from './ThemeProvider';
+import { ArrowUpRight, MessageSquare } from 'lucide-react';
 
-export function MinimalHeader() {
-  const { theme, toggleTheme } = useTheme();
+interface MinimalHeaderProps {
+  onOpenTranscript?: () => void;
+}
 
+export function MinimalHeader({ onOpenTranscript }: MinimalHeaderProps) {
   return (
-    <header className="w-full bg-[var(--bg)]/95 backdrop-blur-xs border-b border-[var(--line)] sticky top-0 z-40 px-6 sm:px-12 py-3.5 transition-colors">
-      <div className="max-w-[850px] mx-auto flex items-center justify-between">
-        {/* Left: Name + Digital Twin Label */}
-        <div className="flex items-center gap-2.5">
-          <a
-            href="/"
-            className="font-bold text-sm tracking-tight text-[var(--text-primary)] hover:opacity-80 transition-opacity font-sans"
-          >
-            SUYASH SINGH
-          </a>
-          <span className="text-[11px] text-[var(--text-muted)] font-mono uppercase tracking-wider">
-            DIGITAL TWIN
-          </span>
-        </div>
+    <header className="w-full bg-[#131314] px-6 py-4 flex items-center justify-between z-40 shrink-0">
+      {/* Left: Chat icon */}
+      <button
+        onClick={onOpenTranscript}
+        className="p-2.5 rounded-full text-[#9E9E9E] hover:text-white hover:bg-[#1E1F20] transition-colors cursor-pointer"
+        aria-label="View history"
+      >
+        <MessageSquare className="w-5 h-5" />
+      </button>
 
-        {/* Right: GitHub + Portfolio Links + Dark Mode Toggle */}
-        <div className="flex items-center gap-5 text-xs text-[var(--text-secondary)]">
-          <a
-            href="https://github.com/anothercodingguy"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-0.5 text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors"
-          >
-            <span>GitHub</span>
-            <ArrowUpRight className="w-3 h-3 text-[var(--text-muted)]" />
-          </a>
-          <a
-            href="https://suyash.website"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-0.5 text-[var(--text-primary)] hover:text-[var(--text-secondary)] transition-colors"
-          >
-            <span>Portfolio</span>
-            <ArrowUpRight className="w-3 h-3 text-[var(--text-muted)]" />
-          </a>
+      {/* Right: GitHub / Portfolio & Avatar */}
+      <div className="flex items-center gap-4 text-xs text-[#9E9E9E]">
+        <a
+          href="https://github.com/anothercodingguy"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden sm:inline-flex items-center gap-1 hover:text-white transition-colors"
+        >
+          <span>GitHub</span>
+          <ArrowUpRight className="w-3 h-3" />
+        </a>
+        <a
+          href="https://suyash.website"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden sm:inline-flex items-center gap-1 hover:text-white transition-colors"
+        >
+          <span>Portfolio</span>
+          <ArrowUpRight className="w-3 h-3" />
+        </a>
 
-          {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="p-1.5 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--line)] transition-colors cursor-pointer"
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-            ) : (
-              <Moon className="w-3.5 h-3.5 text-[#6B6B6B]" />
-            )}
-          </button>
+        {/* Profile Avatar with Google/Gemini style subtle gradient ring */}
+        <div className="relative p-0.5 rounded-full bg-gradient-to-tr from-[#4285F4] via-[#9B72CB] to-[#D96570]">
+          <div className="w-7 h-7 rounded-full bg-[#1E1F20] flex items-center justify-center text-[11px] font-bold text-white font-mono">
+            SS
+          </div>
         </div>
       </div>
     </header>
