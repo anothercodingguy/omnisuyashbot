@@ -16,11 +16,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Query exceeds maximum length of 500 characters' }, { status: 400 });
     }
 
-    const { results, allMatches, queryUsed } = searchProfile(query, history, 6);
+    const { results, allMatches, queryUsed, classification } = searchProfile(query, history, 6);
 
     return NextResponse.json({
       query,
       queryUsed,
+      intent: classification.intent,
+      detectedEntity: classification.detectedEntity,
       total_matched: allMatches.length,
       top_k: results.length,
       results: results.map((r) => ({

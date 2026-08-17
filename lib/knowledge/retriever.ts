@@ -1,4 +1,5 @@
 import { KNOWLEDGE_BASE, KnowledgeChunk } from './chunks';
+import { classifyQuery, ClassifiedQuery, QueryIntent } from './intent';
 
 export interface RetrievalResult {
   chunk: KnowledgeChunk;
@@ -10,6 +11,13 @@ export interface ConversationTurn {
   role: 'user' | 'assistant';
   content: string;
   citedChunkIds?: string[];
+}
+
+export interface SearchProfileReturn {
+  results: KnowledgeChunk[];
+  allMatches: RetrievalResult[];
+  queryUsed: string;
+  classification: ClassifiedQuery;
 }
 
 // Common entity aliases and context keywords
@@ -40,6 +48,7 @@ const ENTITY_ALIASES: Record<string, string[]> = {
     'under 50ms',
     'intent routing',
     'circuit breaker',
+    'circuit-breaker',
     'groq',
     'ollama',
     'qdrant',
@@ -170,6 +179,8 @@ const ENTITY_ALIASES: Record<string, string[]> = {
     'why hire',
     'strongest technical areas',
     'what does he build',
+    'what does he do',
+    'what does suyash do',
   ],
 };
 
@@ -182,63 +193,147 @@ function tokenize(text: string): string[] {
 }
 
 /**
- * Resolves context & entity references from previous conversational turns
- * E.g., User asks "What did he use for visualization?" -> refers to PathFlow (React Flow)
- */
-export function resolveQueryWithContext(query: string, history: ConversationTurn[] = []): string {
-  const qLower = query.toLowerCase();
-  const hasPronounOrVague =
-    /\b(it|he|him|his|this|that|they|the project|the app|the tool|visualization|visualizer|architecture|stack|technologies|backend|cache|framework)\b/i.test(
-      qLower
-    );
-
-  if (!hasPronounOrVague || history.length === 0) {
-    return query;
-  }
-
-  // Look backwards through history for cited entities
-  for (let i = history.length - 1; i >= 0; i--) {
-    const turn = history[i];
-    if (turn.citedChunkIds && turn.citedChunkIds.length > 0) {
-      const primaryChunkId = turn.citedChunkIds[0];
-      const chunk = KNOWLEDGE_BASE.find((c) => c.id === primaryChunkId);
-      if (chunk) {
-        return `${query} ${chunk.entity} ${chunk.title}`;
-      }
-    }
-    const prevText = turn.content.toLowerCase();
-    for (const [chunkId, aliases] of Object.entries(ENTITY_ALIASES)) {
-      for (const alias of aliases) {
-        if (prevText.includes(alias)) {
-          const chunk = KNOWLEDGE_BASE.find((c) => c.id === chunkId);
-          if (chunk) {
-            return `${query} ${chunk.entity} ${alias}`;
-          }
-        }
-      }
-    }
-  }
-
-  return query;
-}
-
-/**
- * Searches the verified knowledge base and returns ranked chunks
+ * Searches the verified knowledge base and returns ranked chunks based on intent, entities, and keywords
  */
 export function searchProfile(
   rawQuery: string,
   history: ConversationTurn[] = [],
   topK: number = 4
-): { results: KnowledgeChunk[]; allMatches: RetrievalResult[]; queryUsed: string } {
-  const query = resolveQueryWithContext(rawQuery, history);
-  const qLower = query.toLowerCase();
-  const queryTokens = tokenize(query);
+): SearchProfileReturn {
+  const classification = classifyQuery(rawQuery, history);
+  const { intent, detectedEntity, resolvedContextQuery, normalizedQuery } = classification;
+  const qLower = resolvedContextQuery.toLowerCase();
+  const queryTokens = tokenize(resolvedContextQuery);
 
+  // 1. Fast path for Greeting, Unsupported Trivia & Injections
+  if (intent === 'greeting' || intent === 'unsupported' || intent === 'prompt_injection') {
+    return {
+      results: [],
+      allMatches: [],
+      queryUsed: rawQuery,
+      classification,
+    };
+  }
+
+  // 2. Multi-domain Chunks for Broad Profile Overview
+  if (intent === 'profile_overview' || intent === 'identity') {
+    const overviewIds = [
+      'resume-identity',
+      'resume-education',
+      'resume-skills-fundamentals',
+      'resume-project-pathflow',
+      'resume-project-semantic-llm',
+      'resume-project-senns',
+      'resume-experience-stealth',
+    ];
+
+    const results = KNOWLEDGE_BASE.filter((c) => overviewIds.includes(c.id));
+    const allMatches: RetrievalResult[] = results.map((c) => ({
+      chunk: c,
+      score: 100,
+      matchedTerms: ['profile_overview', c.category, c.entity],
+    }));
+
+    return {
+      results,
+      allMatches,
+      queryUsed: resolvedContextQuery,
+      classification,
+    };
+  }
+
+  // 3. Intent-Specific Multi-Chunk Pre-Filtering
   const scored: RetrievalResult[] = KNOWLEDGE_BASE.map((chunk) => {
     let score = 0;
     const matchedTerms: string[] = [];
 
-    // 1. Direct Entity and Alias matching
+    // Direct Intent Alignment Boosts
+    switch (intent) {
+      case 'education':
+        if (chunk.id === 'resume-education') {
+          score += 50;
+          matchedTerms.push('intent:education');
+        }
+        break;
+
+      case 'skills':
+        if (chunk.category === 'skills') {
+          score += 40;
+          matchedTerms.push('intent:skills');
+        }
+        break;
+
+      case 'work_experience':
+        if (chunk.category === 'experience') {
+          score += 45;
+          matchedTerms.push('intent:work_experience');
+        }
+        break;
+
+      case 'pathflow':
+        if (chunk.id === 'resume-project-pathflow') {
+          score += 60;
+          matchedTerms.push('intent:pathflow');
+        }
+        break;
+
+      case 'semantic_gateway':
+        if (chunk.id === 'resume-project-semantic-llm') {
+          score += 60;
+          matchedTerms.push('intent:semantic_gateway');
+        }
+        break;
+
+      case 'research':
+        if (chunk.id === 'resume-project-senns') {
+          score += 60;
+          matchedTerms.push('intent:research');
+        }
+        break;
+
+      case 'reachinbox':
+        if (chunk.id === 'resume-project-reachinbox') {
+          score += 60;
+          matchedTerms.push('intent:reachinbox');
+        }
+        break;
+
+      case 'projects':
+        if (chunk.category === 'project') {
+          score += 35;
+          matchedTerms.push('intent:projects');
+        }
+        break;
+
+      case 'leadership':
+        if (chunk.category === 'leadership') {
+          score += 40;
+          matchedTerms.push('intent:leadership');
+        }
+        break;
+
+      case 'competitive_programming':
+        if (chunk.id === 'resume-skills-ml-cp') {
+          score += 45;
+          matchedTerms.push('intent:competitive_programming');
+        }
+        break;
+
+      case 'contact':
+        if (chunk.id === 'resume-identity') {
+          score += 50;
+          matchedTerms.push('intent:contact');
+        }
+        break;
+    }
+
+    // Detected Entity Matching
+    if (detectedEntity && chunk.entity.toLowerCase().includes(detectedEntity.toLowerCase())) {
+      score += 30;
+      matchedTerms.push(`entity:${detectedEntity}`);
+    }
+
+    // Entity & Alias matching
     const aliases = ENTITY_ALIASES[chunk.id] || [];
     for (const alias of aliases) {
       if (qLower.includes(alias.toLowerCase())) {
@@ -247,7 +342,7 @@ export function searchProfile(
       }
     }
 
-    // 2. Keyword exact matching
+    // Keyword exact matching
     for (const kw of chunk.keywords) {
       const kwLower = kw.toLowerCase();
       if (qLower.includes(kwLower)) {
@@ -256,7 +351,7 @@ export function searchProfile(
       }
     }
 
-    // 3. Technologies matching
+    // Technologies matching
     if (chunk.technologies) {
       for (const tech of chunk.technologies) {
         const tLower = tech.toLowerCase();
@@ -267,7 +362,7 @@ export function searchProfile(
       }
     }
 
-    // 4. Token Overlap Scoring
+    // Token Overlap Scoring
     const chunkTokens = tokenize(
       `${chunk.title} ${chunk.section} ${chunk.entity} ${chunk.content}`
     );
@@ -280,44 +375,6 @@ export function searchProfile(
       }
     }
 
-    // 5. Category-level boosts
-    if (
-      (qLower.includes('project') || qLower.includes('built') || qLower.includes('build')) &&
-      chunk.category === 'project'
-    ) {
-      score += 3;
-    }
-    if (
-      (qLower.includes('intern') || qLower.includes('work') || qLower.includes('experience') || qLower.includes('job')) &&
-      chunk.category === 'experience'
-    ) {
-      score += 4;
-    }
-    if (
-      (qLower.includes('study') || qLower.includes('education') || qLower.includes('college') || qLower.includes('degree') || qLower.includes('gpa') || qLower.includes('cgpa')) &&
-      chunk.category === 'education'
-    ) {
-      score += 5;
-    }
-    if (
-      (qLower.includes('skill') || qLower.includes('technolog') || qLower.includes('stack') || qLower.includes('language')) &&
-      (chunk.category === 'skills' || chunk.technologies)
-    ) {
-      score += 3;
-    }
-    if (
-      (qLower.includes('lead') || qLower.includes('club') || qLower.includes('community') || qLower.includes('mentor')) &&
-      chunk.category === 'leadership'
-    ) {
-      score += 4;
-    }
-    if (
-      (qLower.includes('research') || qLower.includes('paper') || qLower.includes('publication') || qLower.includes('unlearning')) &&
-      chunk.id === 'resume-project-senns'
-    ) {
-      score += 6;
-    }
-
     return {
       chunk,
       score,
@@ -328,18 +385,19 @@ export function searchProfile(
   // Filter and sort by score
   const filtered = scored.filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
 
-  // If general "who is suyash" or "why hire" and no specific chunk high scored, include identity & skills
-  if (filtered.length === 0 && (qLower.includes('suyash') || qLower.includes('who') || qLower.includes('hire') || qLower.includes('overview'))) {
-    const fallbackIds = ['resume-identity', 'resume-skills-fundamentals', 'resume-project-pathflow'];
+  // Fallback category retrieval if initial keyword match yielded nothing but query is about Suyash
+  if (filtered.length === 0) {
+    const fallbackIds = ['resume-identity', 'resume-education', 'resume-skills-fundamentals', 'resume-project-pathflow'];
     const fallbacks = KNOWLEDGE_BASE.filter((c) => fallbackIds.includes(c.id)).map((c) => ({
       chunk: c,
       score: 1,
-      matchedTerms: ['general-profile'],
+      matchedTerms: ['fallback-profile'],
     }));
     return {
       results: fallbacks.map((f) => f.chunk),
       allMatches: fallbacks,
-      queryUsed: query,
+      queryUsed: resolvedContextQuery,
+      classification,
     };
   }
 
@@ -348,6 +406,7 @@ export function searchProfile(
   return {
     results: topResults.map((item) => item.chunk),
     allMatches: topResults,
-    queryUsed: query,
+    queryUsed: resolvedContextQuery,
+    classification,
   };
 }
