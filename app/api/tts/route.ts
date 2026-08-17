@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const CHRIS_VOICE_ID = 'iP95p4xoKVk53GoZ742B';
+
 // Splits long text into natural sentence/clause chunks for TTS generation
 function splitTextIntoChunks(text: string, maxLen = 160): string[] {
   const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
@@ -15,7 +17,6 @@ function splitTextIntoChunks(text: string, maxLen = 160): string[] {
     } else {
       if (current) chunks.push(current);
       if (trimmed.length > maxLen) {
-        // Break long sentence by comma or word
         const words = trimmed.split(' ');
         let sub = '';
         for (const w of words) {
@@ -42,18 +43,62 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const text = body.text;
-    const voice = body.voice || process.env.TTS_VOICE || 'alloy';
+    const voice = body.voice || process.env.ELEVENLABS_VOICE_ID || process.env.TTS_VOICE || CHRIS_VOICE_ID;
 
     if (!text || typeof text !== 'string' || !text.trim()) {
       return NextResponse.json({ error: 'Text parameter is required for TTS.' }, { status: 400 });
     }
 
+    const elevenLabsKey = process.env.ELEVENLABS_API_KEY || process.env.XI_API_KEY;
     const openaiKey = process.env.OPENAI_API_KEY;
 
-    // 1. OpenAI TTS Provider (if API key is present)
+    // 1. ElevenLabs TTS with Chris (iP95p4xoKVk53GoZ742B)
+    if (elevenLabsKey) {
+      try {
+        const voiceId = voice.length > 10 ? voice : CHRIS_VOICE_ID;
+        console.log(`[TTS] Generating ElevenLabs speech for ${text.length} chars using voice '${voiceId}' (Chris)`);
+
+        const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+          method: 'POST',
+          headers: {
+            'xi-api-key': elevenLabsKey,
+            'Content-Type': 'application/json',
+            Accept: 'audio/mpeg',
+          },
+          body: JSON.stringify({
+            text: text.trim(),
+            model_id: 'eleven_turbo_v2_5',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.8,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          const audioBuffer = await res.arrayBuffer();
+          console.log(`[TTS] ElevenLabs speech generated (${audioBuffer.byteLength} bytes)`);
+
+          return new NextResponse(audioBuffer, {
+            status: 200,
+            headers: {
+              'Content-Type': 'audio/mpeg',
+              'Content-Length': audioBuffer.byteLength.toString(),
+              'Cache-Control': 'public, max-age=3600',
+            },
+          });
+        }
+        console.warn(`[TTS] ElevenLabs returned ${res.status}: ${res.statusText}, trying fallback`);
+      } catch (e) {
+        console.warn('[TTS] ElevenLabs call error:', e);
+      }
+    }
+
+    // 2. OpenAI TTS Provider Fallback
     if (openaiKey) {
       try {
-        console.log(`[TTS] Generating OpenAI speech for ${text.length} chars using voice '${voice}'`);
+        const openAiVoice = voice.length <= 10 ? voice : 'alloy';
+        console.log(`[TTS] Generating OpenAI speech for ${text.length} chars using voice '${openAiVoice}'`);
         const response = await fetch('https://api.openai.com/v1/audio/speech', {
           method: 'POST',
           headers: {
@@ -63,7 +108,7 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             model: 'tts-1',
             input: text.trim(),
-            voice: voice,
+            voice: openAiVoice,
             response_format: 'mp3',
           }),
         });
@@ -81,13 +126,12 @@ export async function POST(req: NextRequest) {
             },
           });
         }
-        console.warn('[TTS] OpenAI returned non-200, falling back to server neural TTS');
       } catch (e) {
         console.warn('[TTS] OpenAI TTS error, falling back to server neural TTS:', e);
       }
     }
 
-    // 2. High-Fidelity Server-Side Neural TTS Stream (Zero external key required)
+    // 3. High-Fidelity Server-Side Neural TTS Stream (Zero external key required)
     console.log(`[TTS] Generating server-side audio stream for ${text.length} chars`);
     const chunks = splitTextIntoChunks(text.trim());
 

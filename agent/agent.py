@@ -12,7 +12,7 @@ from livekit.agents import (
     llm,
 )
 from livekit.agents.voice_assistant import VoiceAssistant
-from livekit.plugins import deepgram, openai, silero
+from livekit.plugins import deepgram, elevenlabs, openai, silero
 
 load_dotenv()
 
@@ -115,10 +115,27 @@ async def entrypoint(ctx: JobContext):
         logger.info("[LLM] Initializing OpenAI gpt-4o-mini LLM")
         llm_provider = openai.LLM(model="gpt-4o-mini")
 
-    # Determine TTS Provider (LiveKit Agent TTS -> Audio Track)
-    tts_voice = os.getenv("TTS_VOICE", "alloy")
-    logger.info(f"[TTS] Initializing LiveKit Agent TTS (model=tts-1, voice={tts_voice})")
-    tts_provider = openai.TTS(model="tts-1", voice=tts_voice)
+    # Determine TTS Provider (ElevenLabs Chris -> OpenAI TTS)
+    eleven_key = os.getenv("ELEVENLABS_API_KEY") or os.getenv("XI_API_KEY")
+    voice_id = os.getenv("ELEVENLABS_VOICE_ID", "iP95p4xoKVk53GoZ742B")
+    
+    if eleven_key:
+        logger.info(f"[TTS] Initializing ElevenLabs TTS with Chris voice ({voice_id})")
+        tts_provider = elevenlabs.TTS(
+            voice=elevenlabs.Voice(
+                id=voice_id,
+                name="Chris",
+                category="premade"
+            ),
+            model="eleven_turbo_v2_5"
+        )
+    elif os.getenv("OPENAI_API_KEY"):
+        tts_voice = os.getenv("TTS_VOICE", "alloy")
+        logger.info(f"[TTS] Initializing OpenAI TTS (model=tts-1, voice={tts_voice})")
+        tts_provider = openai.TTS(model="tts-1", voice=tts_voice)
+    else:
+        logger.info(f"[TTS] Defaulting to OpenAI TTS voice engine")
+        tts_provider = openai.TTS(model="tts-1", voice="alloy")
 
     # Initialize Voice Assistant pipeline
     assistant = VoiceAssistant(
