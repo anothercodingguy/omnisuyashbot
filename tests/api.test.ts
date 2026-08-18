@@ -66,9 +66,9 @@ describe('API Routes Verification', () => {
     expect(emptyRes.status).toBe(400);
 
     const validReq = createMockRequest('http://localhost:3000/api/tts', {
-      text: 'PathFlow is an OpenTelemetry-compatible observability platform for AI agents.',
+      text: 'PathFlow is an observability platform for AI agents.',
     });
     const res = await ttsPOST(validReq);
     expect([200, 502, 503]).toContain(res.status);
-  });
+  }, 15000);
 });

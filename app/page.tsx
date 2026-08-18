@@ -6,7 +6,8 @@ import { MinimalHeader } from '@/components/MinimalHeader';
 import { MinimalSourceDrawer } from '@/components/MinimalSourceDrawer';
 import { FullTranscriptDrawer } from '@/components/FullTranscriptDrawer';
 import { ActiveVoiceView } from '@/components/ActiveVoiceView';
-import { Mic, Sparkles } from 'lucide-react';
+import { InteractivePlasmaOrb } from '@/components/InteractivePlasmaOrb';
+import { Mic, ArrowUpRight } from 'lucide-react';
 
 export default function Home() {
   const {
@@ -46,7 +47,11 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen w-screen bg-[#101114] text-[#E3E3E3] flex flex-col font-sans selection:bg-[#2A2B2E] overflow-hidden">
+    <div className="h-screen w-screen bg-[#030509] text-[#E3E3E3] flex flex-col font-sans selection:bg-[#1E88E5]/30 overflow-hidden relative">
+      {/* Subtle Ambient Cosmic Background Glow */}
+      <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-radial from-[#00E5FF]/8 via-[#1E88E5]/4 to-transparent blur-3xl pointer-events-none rounded-full" />
+      <div className="absolute bottom-0 right-0 w-[500px] h-[400px] bg-radial from-[#1E88E5]/10 via-[#0A193B]/20 to-transparent blur-3xl pointer-events-none" />
+
       {isVoiceMode ? (
         /* ─── FULL-SCREEN LIVE VOICE EXPERIENCE ─── */
         <ActiveVoiceView
@@ -65,21 +70,17 @@ export default function Home() {
           errorMessage={errorMessage}
         />
       ) : (
-        /* ─── DARK MINIMAL LANDING SCREEN (VOICE-ONLY) ─── */
-        <div className="h-full w-full flex flex-col justify-between items-center p-6 sm:p-10 max-w-5xl mx-auto">
+        /* ─── EXACT REFERENCE HERO LANDING SCREEN WITH MOVING BLUE PLASMA BALL ─── */
+        <div className="h-full w-full flex flex-col justify-between p-6 sm:p-10 lg:p-14 max-w-7xl mx-auto z-10 relative">
           {/* Header */}
           <MinimalHeader onOpenTranscript={() => setIsTranscriptOpen(true)} />
 
-          {/* Connection Error Notice */}
+          {/* Connection Notice if any */}
           {errorMessage && (
-            <div className="w-full max-w-md pt-2 shrink-0">
+            <div className="w-full max-w-md pt-2 shrink-0 mx-auto">
               <div className="p-3.5 rounded-2xl bg-[#2A1515] border border-[#5A2525] text-xs text-[#FC8181] flex items-center justify-between shadow-md">
                 <div className="space-y-0.5">
-                  <span className="font-semibold block">
-                    {errorMessage.toLowerCase().includes('microphone')
-                      ? 'Microphone access required'
-                      : 'Voice Connection Notice'}
-                  </span>
+                  <span className="font-semibold block">Voice Connection Notice</span>
                   <span>{errorMessage}</span>
                 </div>
                 <button
@@ -92,56 +93,79 @@ export default function Home() {
             </div>
           )}
 
-          {/* Center Greeting & Voice Trigger */}
-          <main className="flex-1 w-full flex flex-col justify-center items-center text-center space-y-8 my-auto max-w-2xl px-4">
-            <div className="space-y-3">
-              <h1 className="text-4xl sm:text-6xl font-normal tracking-tight bg-gradient-to-r from-[#4285F4] via-[#9B72CB] to-[#D96570] bg-clip-text text-transparent leading-[1.15]">
-                Hello, Suyash
-              </h1>
-              <p className="text-sm sm:text-base text-[#9E9E9E] max-w-[480px] mx-auto leading-relaxed">
-                AI Digital Twin for Suyash Singh. Realtime voice grounded on verified resume, projects, and research.
-              </p>
-            </div>
-
-            {/* Big Voice CTA Button */}
-            <div className="pt-2">
-              <button
-                onClick={handleStartCall}
-                className="h-[60px] px-8 rounded-full bg-gradient-to-r from-[#4285F4] to-[#9B72CB] hover:opacity-95 text-white font-medium text-base sm:text-lg flex items-center gap-3 shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
-              >
-                <Mic className="w-5 h-5 text-white" />
-                <span>Talk to Suyash</span>
-                <Sparkles className="w-4 h-4 text-white/80" />
-              </button>
-            </div>
-
-            {/* Suggested Prompt Topics */}
-            <div className="space-y-3 pt-4">
-              <span className="text-[11px] font-mono text-[#666666] uppercase tracking-wider block">
-                SUGGESTED TOPICS
-              </span>
-              <div className="flex flex-wrap justify-center gap-2.5">
-                {[
-                  'What is PathFlow?',
-                  'What has Suyash built?',
-                  'Tell me about his internships',
-                  'What is SENNs?',
-                ].map((prompt) => (
-                  <button
-                    key={prompt}
-                    onClick={() => handlePromptClick(prompt)}
-                    className="px-4 py-2 rounded-full bg-[#1E1F20] hover:bg-[#282A2C] border border-[#2E2F32] text-xs sm:text-sm text-[#E3E3E3] transition-all hover:scale-[1.02] active:scale-98 cursor-pointer shadow-sm"
-                  >
-                    {prompt}
-                  </button>
-                ))}
+          {/* Main 2-Column Hero Grid */}
+          <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center my-auto">
+            {/* Left Column: Editorial Typography & Call To Action */}
+            <div className="lg:col-span-6 flex flex-col justify-center space-y-7 z-20">
+              <div className="space-y-4">
+                <h1 className="text-5xl sm:text-6xl lg:text-[4.75rem] font-light tracking-tight text-white leading-[1.06]">
+                  Hello <span className="text-[#8E95A5] font-light">I’m</span><br />
+                  Suyash <span className="text-[#6C768A] font-extralight">Singh</span>
+                </h1>
+                <p className="text-sm sm:text-base text-[#9A9EA6] font-normal leading-relaxed max-w-lg">
+                  AI Digital Twin exploring distributed agent observability (PathFlow), low-latency caching proxies, and machine unlearning research.
+                </p>
               </div>
+
+              {/* Crisp White Pill CTA matching the reference screenshot */}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <button
+                  onClick={handleStartCall}
+                  className="h-12 px-7 rounded-full bg-white hover:bg-[#E8EAED] text-[#0A0D14] font-medium text-sm sm:text-base flex items-center gap-2.5 shadow-[0_0_35px_rgba(0,180,255,0.25)] transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                >
+                  <Mic className="w-4 h-4 text-[#0A0D14]" />
+                  <span>Talk to Suyash</span>
+                </button>
+
+                <button
+                  onClick={() => setIsTranscriptOpen(true)}
+                  className="h-12 px-5 rounded-full bg-[#12151D]/90 hover:bg-[#1C202B] text-[#9A9EA6] hover:text-white border border-white/10 text-xs sm:text-sm transition-all cursor-pointer"
+                >
+                  View Transcript
+                </button>
+              </div>
+
+              {/* Suggested Topics */}
+              <div className="space-y-2.5 pt-2">
+                <span className="text-[11px] font-mono text-[#5A606E] uppercase tracking-wider block">
+                  SUGGESTED TOPICS
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'What is PathFlow?',
+                    'What does he do?',
+                    'Tell me about his internships',
+                    'What is SENNs?',
+                  ].map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => handlePromptClick(prompt)}
+                      className="px-3.5 py-1.5 rounded-full bg-[#0D1017]/90 hover:bg-[#181C26] border border-white/10 text-xs text-[#C5C9D3] transition-all hover:scale-[1.02] active:scale-98 cursor-pointer shadow-sm"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Moving 3D Plasma Sphere Reacting to Cursor */}
+            <div className="lg:col-span-6 w-full h-[360px] sm:h-[460px] lg:h-[560px] flex items-center justify-center relative">
+              <InteractivePlasmaOrb
+                state={state}
+                audioLevel={audioLevel}
+                onClick={handleStartCall}
+              />
             </div>
           </main>
 
-          {/* Footer */}
-          <footer className="w-full text-center text-xs text-[#666666] py-2 shrink-0">
-            <span>Voice-first digital twin · Grounded on verified sources</span>
+          {/* Footer Status Indicators matching reference */}
+          <footer className="w-full flex flex-col sm:flex-row items-center justify-between text-xs text-[#5A606E] py-2 shrink-0 gap-2 border-t border-white/5 pt-4">
+            <span>Grounded on verified technical sources · Published research at ICDDS 2025</span>
+            <span className="flex items-center gap-1.5 text-[#8E95A5]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse" />
+              LiveKit Realtime Voice · Click ball to speak
+            </span>
           </footer>
         </div>
       )}
