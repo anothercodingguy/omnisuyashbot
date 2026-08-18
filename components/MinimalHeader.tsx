@@ -39,13 +39,6 @@ export function MinimalHeader({ onOpenTranscript }: MinimalHeaderProps) {
           <span>Portfolio</span>
           <ArrowUpRight className="w-3 h-3" />
         </a>
-
-        {/* Profile Avatar with Google/Gemini style subtle gradient ring */}
-        <div className="relative p-0.5 rounded-full bg-gradient-to-tr from-[#4285F4] via-[#9B72CB] to-[#D96570]">
-          <div className="w-7 h-7 rounded-full bg-[#1E1F20] flex items-center justify-center text-[11px] font-bold text-white font-mono">
-            SS
-          </div>
-        </div>
       </div>
     </header>
   );

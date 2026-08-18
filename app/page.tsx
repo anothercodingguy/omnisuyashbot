@@ -149,7 +149,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right Column: Moving 3D Plasma Sphere Reacting to Cursor */}
+            {/* Right Column: Moving 3D Plasma Sphere */}
             <div className="lg:col-span-6 w-full h-[360px] sm:h-[460px] lg:h-[560px] flex items-center justify-center relative">
               <InteractivePlasmaOrb
                 state={state}
@@ -158,15 +158,6 @@ export default function Home() {
               />
             </div>
           </main>
-
-          {/* Footer Status Indicators matching reference */}
-          <footer className="w-full flex flex-col sm:flex-row items-center justify-between text-xs text-[#5A606E] py-2 shrink-0 gap-2 border-t border-white/5 pt-4">
-            <span>Grounded on verified technical sources · Published research at ICDDS 2025</span>
-            <span className="flex items-center gap-1.5 text-[#8E95A5]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse" />
-              LiveKit Realtime Voice · Click ball to speak
-            </span>
-          </footer>
         </div>
       )}
 

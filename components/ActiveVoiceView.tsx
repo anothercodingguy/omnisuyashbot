@@ -6,14 +6,12 @@ import { ChatMessage } from './MinimalConversationView';
 import { CitationItem } from '@/lib/knowledge/grounding';
 import { InteractivePlasmaOrb } from './InteractivePlasmaOrb';
 import { FullTranscriptDrawer } from './FullTranscriptDrawer';
-import { MinimalHeader } from './MinimalHeader';
 import {
   Pause,
   Play,
   X,
   RotateCcw,
   MessageSquare,
-  Sparkles,
 } from 'lucide-react';
 
 interface ActiveVoiceViewProps {
@@ -63,40 +61,16 @@ export function ActiveVoiceView({
 
       {/* Main Container */}
       <div className="h-full w-full flex flex-col justify-between p-6 sm:p-10 lg:p-14 max-w-7xl mx-auto z-10 relative">
-        {/* Header */}
-        <header className="w-full flex items-center justify-between z-20 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#12151D] border border-white/10 flex items-center justify-center font-mono text-xs text-white font-bold">
-              SS
-            </div>
-            <div className="flex flex-col">
-              <span className="font-medium text-xs sm:text-sm text-white tracking-wide">
-                Suyash Singh AI
-              </span>
-              <span className="text-[10px] text-[#8E95A5] font-mono">
-                Digital Twin · Realtime Voice
-              </span>
-            </div>
-          </div>
-
-          {/* Right Status Pill & Transcript Trigger */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsTranscriptOpen(true)}
-              className="p-2 rounded-full text-[#9A9EA6] hover:text-white hover:bg-[#12151D] transition-colors cursor-pointer border border-white/5"
-              aria-label="View transcript"
-              title="View Transcript"
-            >
-              <MessageSquare className="w-4 h-4" />
-            </button>
-
-            {isCallActive && (
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#12151D]/90 border border-white/10 text-xs text-[#E3E3E3]">
-                <span className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse" />
-                <span className="font-medium text-xs">Live Voice</span>
-              </div>
-            )}
-          </div>
+        {/* Discreet Top Bar */}
+        <header className="w-full flex items-center justify-end z-20 shrink-0">
+          <button
+            onClick={() => setIsTranscriptOpen(true)}
+            className="p-2 rounded-full text-[#9A9EA6] hover:text-white hover:bg-[#12151D] transition-colors cursor-pointer border border-white/5"
+            aria-label="View transcript"
+            title="View Transcript"
+          >
+            <MessageSquare className="w-4 h-4" />
+          </button>
         </header>
 
         {/* Connection Notice if any */}
@@ -117,11 +91,11 @@ export function ActiveVoiceView({
           </div>
         )}
 
-        {/* Main 2-Column Grid (Identical Layout to Homepage) */}
+        {/* Main 2-Column Grid (Same layout as Homepage) */}
         <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center my-auto">
           {/* Left Column: Voice Status & Resume/Cancel Action Controls */}
           <div className="lg:col-span-6 flex flex-col justify-center space-y-8 z-20">
-            {/* Live Voice State Indicator */}
+            {/* Live Voice State Text */}
             <div className="space-y-3">
               {isEnded ? (
                 <div className="space-y-2">
@@ -143,23 +117,15 @@ export function ActiveVoiceView({
                 </div>
               ) : isThinking ? (
                 <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#12151D] border border-purple-500/20 text-xs text-purple-300 font-medium">
-                    <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-spin" />
-                    <span>Processing</span>
-                  </div>
                   <h2 className="text-4xl sm:text-5xl font-light text-white tracking-tight">
                     Thinking…
                   </h2>
                   <p className="text-sm text-[#9A9EA6]">
-                    Formulating grounded response from verified sources.
+                    Formulating response from verified profile sources.
                   </p>
                 </div>
               ) : isSpeaking ? (
                 <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#12151D] border border-cyan-500/20 text-xs text-cyan-300 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-[#00E5FF] animate-ping" />
-                    <span>Speaking</span>
-                  </div>
                   <h2 className="text-4xl sm:text-5xl font-light text-white tracking-tight">
                     Suyash AI is speaking
                   </h2>
@@ -178,10 +144,6 @@ export function ActiveVoiceView({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#12151D] border border-emerald-500/20 text-xs text-emerald-300 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-[#34A853] animate-pulse" />
-                    <span>{isMuted ? 'Paused / On Hold' : 'Listening'}</span>
-                  </div>
                   <h2 className="text-4xl sm:text-5xl font-light text-white tracking-tight">
                     {isMuted ? 'Conversation on Hold' : 'Listening…'}
                   </h2>
@@ -271,15 +233,6 @@ export function ActiveVoiceView({
             />
           </div>
         </main>
-
-        {/* Footer Status Indicators */}
-        <footer className="w-full flex flex-col sm:flex-row items-center justify-between text-xs text-[#5A606E] py-2 shrink-0 gap-2 border-t border-white/5 pt-4">
-          <span>Grounded on verified technical sources · LiveKit Realtime Voice</span>
-          <span className="flex items-center gap-1.5 text-[#8E95A5]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse" />
-            {isCallActive ? 'Voice active · Tap orb to interrupt' : 'Ready to start'}
-          </span>
-        </footer>
       </div>
 
       {/* Full Transcript Drawer */}
