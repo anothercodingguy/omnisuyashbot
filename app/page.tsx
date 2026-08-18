@@ -7,6 +7,7 @@ import { MinimalSourceDrawer } from '@/components/MinimalSourceDrawer';
 import { FullTranscriptDrawer } from '@/components/FullTranscriptDrawer';
 import { ActiveVoiceView } from '@/components/ActiveVoiceView';
 import { InteractivePlasmaOrb } from '@/components/InteractivePlasmaOrb';
+import { DiaTextAnimation } from '@/components/DiaTextAnimation';
 import { Mic, ArrowUpRight } from 'lucide-react';
 
 export default function Home() {
@@ -125,27 +126,9 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Suggested Topics */}
-              <div className="space-y-2.5 pt-2">
-                <span className="text-[11px] font-mono text-[#5A606E] uppercase tracking-wider block">
-                  SUGGESTED TOPICS
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    'What is PathFlow?',
-                    'What does he do?',
-                    'Tell me about his internships',
-                    'What is SENNs?',
-                  ].map((prompt) => (
-                    <button
-                      key={prompt}
-                      onClick={() => handlePromptClick(prompt)}
-                      className="px-3.5 py-1.5 rounded-full bg-[#0D1017]/90 hover:bg-[#181C26] border border-white/10 text-xs text-[#C5C9D3] transition-all hover:scale-[1.02] active:scale-98 cursor-pointer shadow-sm"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
+              {/* Dia-style Chromatic Cycling Prompt Animation */}
+              <div className="pt-2">
+                <DiaTextAnimation onSelectPrompt={handlePromptClick} />
               </div>
             </div>
 
