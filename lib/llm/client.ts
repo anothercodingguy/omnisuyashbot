@@ -25,7 +25,7 @@ export async function generateGroundedAnswer(
   // 3. Conversational Router: Greetings (e.g. "hello", "hello hello", "hey there")
   if (intent === 'greeting') {
     return {
-      answer: "Hey! What would you like to know about me?",
+      answer: "Hey! Great to meet you. Feel free to ask about my engineering work, projects like PathFlow, research, or background.",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -35,7 +35,7 @@ export async function generateGroundedAnswer(
   // 4. Conversational Router: Acknowledgements (e.g. "thanks", "cool thanks", "thank you")
   if (intent === 'acknowledgement') {
     return {
-      answer: "Of course! Let me know if you want to explore any other projects or details.",
+      answer: "Glad that helped! Let me know if you want to dive deeper into any of the architecture or details.",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -45,7 +45,7 @@ export async function generateGroundedAnswer(
   // 5. Conversational Router: Confirmations (e.g. "okay", "cool", "got it", "nice")
   if (intent === 'confirmation') {
     return {
-      answer: "Sure! What would you like to explore next?",
+      answer: "Awesome! What would you like to check out next?",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -65,7 +65,7 @@ export async function generateGroundedAnswer(
   // 7. Conversational Router: Smalltalk (e.g. "how are you", "how's it going")
   if (intent === 'smalltalk') {
     return {
-      answer: "Doing great! What would you like to know about me?",
+      answer: "Doing great, thanks for asking! Just working on some AI systems and project ideas. How are you doing?",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -75,7 +75,7 @@ export async function generateGroundedAnswer(
   // 8. Conversational Router: Identity (e.g. "who are you?")
   if (intent === 'identity') {
     return {
-      answer: "I’m Suyash’s AI digital twin. You can ask me about my projects, engineering work, research, and technical background.",
+      answer: "I’m Suyash’s AI digital twin! You can ask me about my projects like PathFlow, my machine unlearning research at ICDDS 2025, or my engineering background.",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -304,7 +304,7 @@ function generateDeterministicGroundedResponse(
   const { intent, subtopic } = classification;
   const qLower = query.toLowerCase().replace(/[’‘]/g, "'");
 
-  // 1. Broad Profile Overview Intent (e.g. "What does he do?", "Tell me about his background", "Tell me about yourself")
+  // 1. Broad Profile Overview Intent (e.g. "What are you working on?", "Tell me about yourself", "What do you do?")
   if (intent === 'profile_overview') {
     const citedIds = [
       'resume-identity',
@@ -317,7 +317,7 @@ function generateDeterministicGroundedResponse(
 
     return {
       answer:
-        "I'm a Computer Science student at Manipal Institute of Technology focused on software engineering, AI systems, and backend infrastructure. I built PathFlow and the Semantic LLM Gateway, published machine unlearning research at ICDDS 2025, and have experience building distributed AWS inference pipelines at a Stealth Startup.",
+        "Right now, I'm mainly focused on AI systems and backend infrastructure. Recently, I built PathFlow—an OpenTelemetry observability platform for autonomous AI agent fleets—and a Semantic LLM Gateway with sub-50ms Qdrant caching. I also do research in machine unlearning.",
       citations: availableCitations,
       grounded: true,
       retrieved_chunk_ids: citedIds,
@@ -332,7 +332,7 @@ function generateDeterministicGroundedResponse(
     const eduCitations = validateCitations(['resume-education'], [eduChunk, ...retrievedChunks]);
     return {
       answer:
-        "I'm pursuing a B.Tech in Computer Science Engineering (Data Science) at Manipal Institute of Technology, Bengaluru, with an expected graduation in 2027 and a CGPA of 8.51/10.",
+        "I'm studying Computer Science (Data Science) at Manipal Institute of Technology in Bengaluru, graduating in 2027 with an 8.51 CGPA. I focus heavily on systems, algorithms, and AI infrastructure.",
       citations: eduCitations,
       grounded: true,
       retrieved_chunk_ids: ['resume-education'],
@@ -351,7 +351,7 @@ function generateDeterministicGroundedResponse(
     );
     return {
       answer:
-        "I worked as an AI Intern at a Stealth Startup building scalable AWS distributed inference pipelines and state machines (Dec 2025 – May 2026), and as an R&D Intern at IEEE Computer Society Bangalore Chapter evaluating distributed architectures (Apr 2025 – Sept 2025).",
+        "I was an AI Intern at a Stealth Startup building scalable AWS distributed inference pipelines and state machines, and an R&D Intern at the IEEE Computer Society Bangalore Chapter evaluating distributed architectures.",
       citations: expCitations,
       grounded: true,
       retrieved_chunk_ids: targetChunks.map((c) => c.id),
@@ -377,7 +377,7 @@ function generateDeterministicGroundedResponse(
     if (subtopic === 'tech_stack' || qLower.includes('technolog') || qLower.includes('built with') || qLower.includes('stack') || qLower.includes('used to build')) {
       return {
         answer:
-          "I built PathFlow using Next.js 15, TypeScript, Tailwind CSS, React Flow, Prisma, OpenTelemetry, and Python, featuring a lightweight @pf.trace SDK for streaming execution spans.",
+          "I built PathFlow using Next.js 15, TypeScript, Tailwind CSS, React Flow, Prisma, OpenTelemetry, and Python, with a lightweight @pf.trace SDK for streaming execution spans.",
         citations: pathCitations,
         grounded: true,
         retrieved_chunk_ids: ['resume-project-pathflow'],
@@ -385,7 +385,7 @@ function generateDeterministicGroundedResponse(
     }
     return {
       answer:
-        "PathFlow is my OpenTelemetry-compatible observability platform for autonomous AI agent fleets, described as 'Strava for AI Agents.' It tracks execution paths, token velocity, context volume, and API compute costs, with a React Flow DAG visualizer.",
+        "PathFlow is my OpenTelemetry-compatible observability platform for autonomous AI agent fleets—think 'Strava for AI Agents.' It tracks execution paths, token velocity, context volume, and compute costs with an interactive React Flow DAG visualizer.",
       citations: pathCitations,
       grounded: true,
       retrieved_chunk_ids: ['resume-project-pathflow'],
@@ -415,7 +415,7 @@ function generateDeterministicGroundedResponse(
     const sennCitations = validateCitations(['resume-project-senns'], [sennChunk, ...retrievedChunks]);
     return {
       answer:
-        "SENNs (Self-Erasing Neural Networks) is my peer-reviewed research publication accepted at the ICDDS 2025 international conference. I co-authored this algorithmic framework for GDPR-compliant machine unlearning, developing diagnostic pipelines in Python and PyTorch.",
+        "SENNs (Self-Erasing Neural Networks) is my co-authored research paper on GDPR-compliant machine unlearning, accepted at the ICDDS 2025 conference. We designed algorithmic diagnostic pipelines in Python and PyTorch to evaluate weight shifts and accuracy trade-offs.",
       citations: sennCitations,
       grounded: true,
       retrieved_chunk_ids: ['resume-project-senns'],
@@ -446,7 +446,7 @@ function generateDeterministicGroundedResponse(
     );
     return {
       answer:
-        "I've built several key projects: PathFlow (an OpenTelemetry observability platform for AI agent fleets), the Semantic LLM Gateway (a low-latency FastAPI proxy with Qdrant caching under 50ms), ReachInbox (a concurrent distributed email scheduler), and SENNs (peer-reviewed research in machine unlearning accepted at ICDDS 2025).",
+        "I've built several key systems: PathFlow (an OpenTelemetry observability platform for AI agent fleets), the Semantic LLM Gateway (a low-latency FastAPI proxy with sub-50ms Qdrant caching), ReachInbox (a concurrent distributed email scheduler), and SENNs (peer-reviewed research in machine unlearning at ICDDS 2025).",
       citations: projectCitations,
       grounded: true,
       retrieved_chunk_ids: projectChunks.map((c) => c.id),
@@ -462,7 +462,7 @@ function generateDeterministicGroundedResponse(
     );
     return {
       answer:
-        "My core technical stack spans Data Structures & Algorithms, System Design, Java, C++, Python, TypeScript, Node.js, FastAPI, Docker, Kubernetes, AWS, GCP, Redis, Qdrant, Prometheus, and PyTorch. I'm also a Codeforces Pupil (1224 rating) with 200+ LeetCode problems solved.",
+        "My core technical stack centers around Python, TypeScript, Java, C++, FastAPI, and Node.js, with infrastructure on AWS, Docker, Kubernetes, Redis, and Qdrant. I'm also active in competitive programming as a Codeforces Pupil (1224 rating) with 200+ LeetCode problems solved.",
       citations: skillCitations,
       grounded: true,
       retrieved_chunk_ids: skillChunks.map((c) => c.id),
@@ -477,7 +477,7 @@ function generateDeterministicGroundedResponse(
     const leadCitations = validateCitations(['resume-leadership-mbosc'], [mboscChunk, ...retrievedChunks]);
     return {
       answer:
-        "I served as Project Head for the Manipal Bengaluru Open-Source Community (MBOSC 2024–2025), mentoring over 200 student developers on system architecture and code reviews, and as Project Head for Codex competitive programming club in 2025.",
+        "I served as Project Head for the Manipal Bengaluru Open-Source Community (MBOSC), mentoring over 200 student developers on system architecture and code reviews, and as Project Head for the Codex competitive programming club.",
       citations: leadCitations,
       grounded: true,
       retrieved_chunk_ids: ['resume-leadership-mbosc'],
@@ -492,7 +492,7 @@ function generateDeterministicGroundedResponse(
     const cpCitations = validateCitations(['resume-skills-ml-cp'], [cpChunk, ...retrievedChunks]);
     return {
       answer:
-        "In competitive programming and problem solving, I'm a Codeforces Pupil with a peak rating of 1224, have solved over 200 problems on LeetCode, and hold a 3★ rating on CodeChef.",
+        "In competitive programming, I'm a Codeforces Pupil with a peak rating of 1224, have solved over 200 problems on LeetCode, and hold a 3★ rating on CodeChef.",
       citations: cpCitations,
       grounded: true,
       retrieved_chunk_ids: ['resume-skills-ml-cp'],
@@ -520,7 +520,7 @@ function generateDeterministicGroundedResponse(
     const citations = validateCitations([primary.id], retrievedChunks);
     return {
       answer:
-        "I'm a Computer Science student and systems engineer specializing in AI agent observability (PathFlow), low-latency AI proxies, and distributed inference. I combine strong CS fundamentals (8.51 CGPA at Manipal, Codeforces Pupil) with production backend engineering on AWS and published machine unlearning research at ICDDS 2025.",
+        "I'm a systems engineer and Computer Science student at Manipal focused on AI infrastructure. I've built projects like PathFlow for agent observability and low-latency LLM proxies, and co-authored machine unlearning research at ICDDS 2025.",
       citations,
       grounded: true,
       retrieved_chunk_ids: [primary.id],

@@ -399,8 +399,23 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
   let intent: QueryIntent = 'general_query';
   let expandedKeywords: string[] = [];
 
-  // Broad Profile Overview (e.g. "What does he do?", "What does Suyash do?", "Tell me about his background")
+  // Broad Profile Overview & Current Focus (e.g. "what are you working on currently", "tell me about yourself", "what do you do")
   if (
+    normalized.includes('working on') ||
+    normalized.includes('what are you up to') ||
+    normalized.includes('what are you building') ||
+    normalized.includes('tell me about yourself') ||
+    normalized.includes('tell me about your work') ||
+    normalized.includes('what do you do') ||
+    normalized === 'what do you build' ||
+    normalized.includes('what is your background') ||
+    normalized.includes('whats your background') ||
+    normalized.includes("what's your background") ||
+    normalized.includes('tell me about your background') ||
+    normalized.includes('what are your focus areas') ||
+    normalized.includes('what do you specialize in') ||
+    normalized.includes('what are your main areas') ||
+    normalized.includes('what are your strengths') ||
     normalized === 'what does he do' ||
     normalized === 'what does suyash do' ||
     normalized.includes('what kind of engineer') ||
@@ -411,7 +426,6 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     normalized.includes('what does he work on') ||
     normalized.includes('what does suyash work on') ||
     normalized.includes('what is suyash into') ||
-    normalized.includes('what are his main areas') ||
     normalized.includes('give me an overview') ||
     normalized.includes('what does he specialize in') ||
     normalized.includes('tell me about his technical background') ||
