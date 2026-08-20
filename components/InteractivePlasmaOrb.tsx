@@ -19,6 +19,7 @@ export function InteractivePlasmaOrb({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const audioLevelRef = useRef(audioLevel);
+  const smoothAudioRef = useRef(0);
   const stateRef = useRef(state);
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export function InteractivePlasmaOrb({
       }
     `;
 
-    // Fragment Shader: Ethereal Celestial Nebula Sphere (Soft, Gaseous, Wispy, Luminous, Pure Organic Motion)
+    // Fragment Shader: Ethereal Celestial Nebula Sphere with High-Fidelity Voice Waveform Reactivity
     const fsSource = `
       precision highp float;
       varying vec2 v_uv;
@@ -62,6 +63,7 @@ export function InteractivePlasmaOrb({
       uniform vec2 u_resolution;
       uniform float u_time;
       uniform float u_audio;
+      uniform float u_state;
 
       // Simplex-like 3D noise functions for smooth volumetric gas
       vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -152,10 +154,16 @@ export function InteractivePlasmaOrb({
         vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / min(u_resolution.x, u_resolution.y);
 
         float dist = length(uv);
-        float baseRadius = 0.38 + u_audio * 0.03;
 
-        // Smooth continuous autonomous time flow (NO cursor reaction)
-        float t = u_time * 0.22;
+        // Dynamic voice reactivity envelope
+        float audioAmp = clamp(u_audio * 1.8, 0.0, 1.0);
+        
+        // Base radius breathably expands and ripples with voice
+        float idleBreath = sin(u_time * 1.8) * 0.008;
+        float baseRadius = 0.38 + idleBreath + audioAmp * 0.075;
+
+        // Flow speed surges organically with speech
+        float t = u_time * (0.22 + audioAmp * 0.6);
 
         // 3D coordinates on celestial sphere
         float z2 = baseRadius * baseRadius - dist * dist;
@@ -180,11 +188,18 @@ export function InteractivePlasmaOrb({
           p.xz = rot2D(t * 0.25) * p.xz;
           p.yz = rot2D(t * 0.18) * p.yz;
 
+          // Harmonic voice waveforms rippling across the surface
+          vec3 voiceRipples = vec3(
+            sin(p.y * 8.0 + u_time * 5.0) * audioAmp * 0.18,
+            cos(p.z * 8.0 + u_time * 4.0) * audioAmp * 0.18,
+            sin(p.x * 8.0 + u_time * 5.0) * audioAmp * 0.18
+          );
+
           // Domain warping for wispy organic nebula filaments
           vec3 q = vec3(
-            fbm(p * 2.2 + vec3(t * 0.2, -t * 0.15, 0.0)),
-            fbm(p * 2.5 + vec3(-t * 0.15, t * 0.2, 0.4)),
-            fbm(p * 2.3 + vec3(0.2, t * 0.1, -t * 0.25))
+            fbm(p * 2.2 + vec3(t * 0.2, -t * 0.15, 0.0) + voiceRipples),
+            fbm(p * 2.5 + vec3(-t * 0.15, t * 0.2, 0.4) - voiceRipples),
+            fbm(p * 2.3 + vec3(0.2, t * 0.1, -t * 0.25) + voiceRipples * 0.5)
           );
 
           vec3 r = vec3(
@@ -195,33 +210,34 @@ export function InteractivePlasmaOrb({
 
           float density = fbm(p * 2.0 + r * 1.8);
 
-          // Ethereal nebula coloring
+          // Ethereal nebula coloring with audio-boosted vibrancy
           vec3 nebula = mix(deepIndigo, royalAzure, smoothstep(-0.4, 0.15, density));
           nebula = mix(nebula, vibrantCyan, smoothstep(0.05, 0.55, density));
-          nebula = mix(nebula, brightWhite, smoothstep(0.45, 0.95, density) * 0.9);
+          nebula = mix(nebula, brightWhite, smoothstep(0.44 - audioAmp * 0.14, 0.95, density) * (0.9 + audioAmp * 0.5));
 
-          // Luminous celestial star core hotspot
-          float coreGlow = smoothstep(0.4, 0.0, dist) * 0.4;
+          // Luminous celestial star core hotspot (pulses brightly when voice speaks)
+          float coreGlow = smoothstep(0.4 + audioAmp * 0.12, 0.0, dist) * (0.4 + audioAmp * 0.7);
           nebula += vibrantCyan * coreGlow;
 
-          // Soft gaseous edge translucency (wispy cloud boundary, not a hard ball)
+          // Soft gaseous edge translucency
           float edgeSoftness = smoothstep(baseRadius, baseRadius * 0.72, dist);
           float gasEdge = 0.65 + 0.35 * edgeSoftness;
 
-          // Soft rim fresnel illumination
+          // Soft rim fresnel illumination reacting to voice
           float fresnel = pow(1.0 - z, 1.8);
-          nebula += mix(royalAzure, vibrantCyan, fresnel) * fresnel * 0.85;
+          nebula += mix(royalAzure, vibrantCyan, fresnel) * fresnel * (0.85 + audioAmp * 0.6);
 
           col = nebula;
           alpha = (0.78 + 0.22 * density) * gasEdge;
         } else {
-          // Soft Ethereal Atmospheric Corona Glow (Expanding gracefully into dark space)
+          // Soft Ethereal Atmospheric Corona Glow (Expanding dynamically with speech energy)
           float outerDist = dist - baseRadius;
-          if (outerDist < 0.22) {
-            float halo = pow(1.0 - (outerDist / 0.22), 2.5);
-            vec3 haloCol = mix(deepIndigo, vibrantCyan, halo * 0.85);
-            col = haloCol * halo * 0.75;
-            alpha = halo * 0.65;
+          float haloReach = 0.22 + audioAmp * 0.18;
+          if (outerDist < haloReach) {
+            float halo = pow(1.0 - (outerDist / haloReach), 2.3);
+            vec3 haloCol = mix(deepIndigo, vibrantCyan, halo * (0.85 + audioAmp * 0.15));
+            col = haloCol * halo * (0.75 + audioAmp * 0.75);
+            alpha = halo * (0.65 + audioAmp * 0.3);
           }
         }
 
@@ -277,6 +293,7 @@ export function InteractivePlasmaOrb({
     const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
     const timeLocation = gl.getUniformLocation(program, 'u_time');
     const audioLocation = gl.getUniformLocation(program, 'u_audio');
+    const stateLocation = gl.getUniformLocation(program, 'u_state');
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -306,10 +323,21 @@ export function InteractivePlasmaOrb({
 
       const elapsed = (time - startTime) * 0.001;
 
+      // Smooth interpolation for audio level to avoid abrupt frame-to-frame jumps
+      const targetAudio = audioLevelRef.current;
+      smoothAudioRef.current += (targetAudio - smoothAudioRef.current) * 0.2;
+
+      let stateNum = 0.0;
+      if (stateRef.current === 'listening') stateNum = 1.0;
+      else if (stateRef.current === 'thinking') stateNum = 2.0;
+      else if (stateRef.current === 'speaking') stateNum = 3.0;
+      else if (stateRef.current === 'connecting' || stateRef.current === 'reconnecting') stateNum = 4.0;
+
       gl.useProgram(program);
       gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
       gl.uniform1f(timeLocation, elapsed);
-      gl.uniform1f(audioLocation, audioLevelRef.current);
+      gl.uniform1f(audioLocation, smoothAudioRef.current);
+      gl.uniform1f(stateLocation, stateNum);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -345,3 +373,4 @@ export function InteractivePlasmaOrb({
     </div>
   );
 }
+
