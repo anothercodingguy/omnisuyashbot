@@ -7,6 +7,7 @@ export type QueryIntent =
   | 'farewell'
   | 'smalltalk'
   | 'identity'
+  | 'current_activity'
   | 'conversational_overview'
   | 'profile_overview'
   | 'education'
@@ -22,6 +23,7 @@ export type QueryIntent =
   | 'contact'
   | 'prompt_injection'
   | 'unsupported'
+  | 'ambiguous'
   | 'general_query';
 
 export interface ClassifiedQuery {
@@ -67,10 +69,16 @@ const UNSUPPORTED_TRIGGERS = [
   'favourite sport',
   'favorite player',
   'favorite song',
+  'favorite music',
   'how old is',
   'what is his age',
+  'what is your age',
   'what is suyash age',
+  'how old are you',
   'when was he born',
+  'when were you born',
+  'birthday',
+  'birth date',
   'girlfriend',
   'boyfriend',
   'salary',
@@ -80,6 +88,9 @@ const UNSUPPORTED_TRIGGERS = [
   'how much money',
   'net worth',
   'where was he born',
+  'where do you live',
+  'where does he live',
+  'home address',
   'hometown',
   'parents',
   'father',
@@ -90,6 +101,40 @@ const UNSUPPORTED_TRIGGERS = [
   'marital',
   'married',
   'crush',
+  'what do you do on weekends',
+  'what does he do on weekends',
+  'weekend plans',
+  'weekends',
+];
+
+const CURRENT_ACTIVITY_PATTERNS = [
+  'doing today',
+  'doing right now',
+  'up to today',
+  'up to right now',
+  'working on today',
+  'working on right now',
+  'working on at the moment',
+  'working on these days',
+  'building right now',
+  'building today',
+  'did you do today',
+  'did he do today',
+  'what did you do today',
+  'what are you doing today',
+  'what are you doing right now',
+  'what are you up to right now',
+  'what is he doing today',
+  'what is he doing right now',
+  'what is he up to today',
+  'what is suyash doing today',
+  'what is suyash doing right now',
+  'what is suyash working on today',
+  'what are your plans today',
+  'plans for today',
+  'plans for the weekend',
+  'what are your plans',
+  'what are you up to',
 ];
 
 // Conversational Greeting patterns (handles single/multi-word/repeated greetings)
@@ -150,7 +195,21 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 3. Conversational Router: Greetings (e.g. "hello", "hello hello", "hey there", "hi suyash")
+  // 3. Check Current / Temporal Activity (e.g. "what are you doing today?", "what did you do today?")
+  if (CURRENT_ACTIVITY_PATTERNS.some((p) => normalized.includes(p))) {
+    return {
+      rawQuery,
+      normalizedQuery: normalized,
+      intent: 'current_activity',
+      isConversational: false,
+      detectedEntity: 'Suyash',
+      subtopic: 'today',
+      expandedKeywords: [],
+      resolvedContextQuery: rawQuery,
+    };
+  }
+
+  // 4. Conversational Router: Greetings (e.g. "hello", "hello hello", "hey there", "hi suyash")
   const tokens = normalized.split(' ').filter(Boolean);
   const isPureGreeting =
     tokens.length > 0 &&
@@ -176,7 +235,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 4. Conversational Acknowledgements (e.g. "thanks", "thank you", "cool thanks", "thx")
+  // 5. Conversational Acknowledgements (e.g. "thanks", "thank you", "cool thanks", "thx")
   if (
     normalized === 'thanks' ||
     normalized === 'thank you' ||
@@ -201,7 +260,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 5. Conversational Confirmations (e.g. "okay", "cool", "got it", "nice", "awesome", "sure")
+  // 6. Conversational Confirmations (e.g. "okay", "cool", "got it", "nice", "awesome", "sure")
   if (
     normalized === 'okay' ||
     normalized === 'ok' ||
@@ -234,7 +293,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 6. Conversational Farewells (e.g. "bye", "goodbye", "see you", "cya")
+  // 7. Conversational Farewells (e.g. "bye", "goodbye", "see you", "cya")
   if (
     normalized === 'bye' ||
     normalized === 'goodbye' ||
@@ -259,7 +318,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 7. Smalltalk (e.g. "how are you", "how's it going", "what's up")
+  // 8. Smalltalk (e.g. "how are you", "how's it going", "what's up")
   if (
     normalized === 'how are you' ||
     normalized === 'how are you doing' ||
@@ -282,7 +341,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 8. Identity / "Who are you?"
+  // 9. Identity / "Who are you?"
   if (
     normalized === 'who are you' ||
     normalized === 'what are you' ||
@@ -304,7 +363,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 9. "What can you tell me about Suyash?" / Conversational Overview / Topic Suggestions
+  // 10. "What can you tell me about Suyash?" / Conversational Overview / Topic Suggestions
   if (
     normalized.includes('what can you tell me') ||
     normalized.includes('what do you know about') ||
@@ -335,7 +394,7 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 10. Entity Detection in Current Query or Conversation Context
+  // 11. Entity Detection in Current Query or Conversation Context
   let detectedEntity: string | null = null;
   let subtopic: string | null = null;
 
@@ -395,27 +454,40 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     subtopic = 'caching';
   }
 
-  // 11. Factual Intent Classification
+  // 12. Check Ambiguous queries without clear context
+  const isAmbiguousQuery =
+    (normalized === 'what did he use' ||
+      normalized === 'what did you use' ||
+      normalized === 'and the visualization' ||
+      normalized === 'what did he build' ||
+      normalized === 'what did you build' ||
+      normalized === 'how does the system work' ||
+      normalized === 'how does it work' ||
+      normalized === 'tell me about the project' ||
+      normalized === 'what about the project' ||
+      normalized === 'what about the gateway' ||
+      normalized === 'what about the research') &&
+    !detectedEntity;
+
+  if (isAmbiguousQuery) {
+    return {
+      rawQuery,
+      normalizedQuery: normalized,
+      intent: 'ambiguous',
+      isConversational: true,
+      detectedEntity: null,
+      subtopic,
+      expandedKeywords: [],
+      resolvedContextQuery: rawQuery,
+    };
+  }
+
+  // 13. Factual Intent Classification
   let intent: QueryIntent = 'general_query';
   let expandedKeywords: string[] = [];
 
-  // Broad Profile Overview & Current Focus (e.g. "what are you working on currently", "tell me about yourself", "what do you do")
+  // Broad Profile Overview (e.g. "What does he do?", "Tell me about his background", "What kind of engineer is he?")
   if (
-    normalized.includes('working on') ||
-    normalized.includes('what are you up to') ||
-    normalized.includes('what are you building') ||
-    normalized.includes('tell me about yourself') ||
-    normalized.includes('tell me about your work') ||
-    normalized.includes('what do you do') ||
-    normalized === 'what do you build' ||
-    normalized.includes('what is your background') ||
-    normalized.includes('whats your background') ||
-    normalized.includes("what's your background") ||
-    normalized.includes('tell me about your background') ||
-    normalized.includes('what are your focus areas') ||
-    normalized.includes('what do you specialize in') ||
-    normalized.includes('what are your main areas') ||
-    normalized.includes('what are your strengths') ||
     normalized === 'what does he do' ||
     normalized === 'what does suyash do' ||
     normalized.includes('what kind of engineer') ||
@@ -430,10 +502,17 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     normalized.includes('what does he specialize in') ||
     normalized.includes('tell me about his technical background') ||
     normalized.includes('what are his strengths') ||
+    normalized.includes('what are his focus areas') ||
     normalized.includes('why should someone hire') ||
     normalized.includes('why hire suyash') ||
     normalized.includes('who would hire') ||
-    normalized.includes('who is suyash')
+    normalized.includes('who is suyash') ||
+    normalized.includes('tell me about yourself') ||
+    normalized.includes('tell me about your background') ||
+    normalized.includes('what is your background') ||
+    normalized.includes('whats your background') ||
+    normalized.includes("what's your background") ||
+    normalized.includes('what do you do')
   ) {
     intent = 'profile_overview';
     expandedKeywords = [

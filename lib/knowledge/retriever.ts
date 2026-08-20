@@ -205,11 +205,13 @@ export function searchProfile(
   const qLower = resolvedContextQuery.toLowerCase();
   const queryTokens = tokenize(resolvedContextQuery);
 
-  // 1. Fast path for Conversational Intents (greetings, smalltalk, acknowledgements, farewells, identity, unsupported, injections)
+  // 1. Fast path for Conversational Intents (greetings, smalltalk, acknowledgements, farewells, identity, current_activity, unsupported, injections, ambiguous)
   if (
     classification.isConversational ||
+    intent === 'current_activity' ||
     intent === 'unsupported' ||
-    intent === 'prompt_injection'
+    intent === 'prompt_injection' ||
+    intent === 'ambiguous'
   ) {
     return {
       results: [],
@@ -386,20 +388,14 @@ export function searchProfile(
     };
   });
 
-  // Filter and sort by score
-  const filtered = scored.filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
+  // Filter by relevance threshold (requires intentional match, not random word overlap)
+  const RELEVANCE_THRESHOLD = 5;
+  const filtered = scored.filter((item) => item.score >= RELEVANCE_THRESHOLD).sort((a, b) => b.score - a.score);
 
-  // Fallback category retrieval if initial keyword match yielded nothing but query is about Suyash
   if (filtered.length === 0) {
-    const fallbackIds = ['resume-identity', 'resume-education', 'resume-skills-fundamentals', 'resume-project-pathflow'];
-    const fallbacks = KNOWLEDGE_BASE.filter((c) => fallbackIds.includes(c.id)).map((c) => ({
-      chunk: c,
-      score: 1,
-      matchedTerms: ['fallback-profile'],
-    }));
     return {
-      results: fallbacks.map((f) => f.chunk),
-      allMatches: fallbacks,
+      results: [],
+      allMatches: [],
       queryUsed: resolvedContextQuery,
       classification,
     };

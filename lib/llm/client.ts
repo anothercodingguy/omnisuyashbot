@@ -25,7 +25,7 @@ export async function generateGroundedAnswer(
   // 3. Conversational Router: Greetings (e.g. "hello", "hello hello", "hey there")
   if (intent === 'greeting') {
     return {
-      answer: "Hey! Great to meet you. Feel free to ask about my engineering work, projects like PathFlow, research, or background.",
+      answer: "Hey! What would you like to know about Suyash?",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -35,7 +35,7 @@ export async function generateGroundedAnswer(
   // 4. Conversational Router: Acknowledgements (e.g. "thanks", "cool thanks", "thank you")
   if (intent === 'acknowledgement') {
     return {
-      answer: "Glad that helped! Let me know if you want to dive deeper into any of the architecture or details.",
+      answer: "Of course!",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -45,7 +45,7 @@ export async function generateGroundedAnswer(
   // 5. Conversational Router: Confirmations (e.g. "okay", "cool", "got it", "nice")
   if (intent === 'confirmation') {
     return {
-      answer: "Awesome! What would you like to check out next?",
+      answer: "Glad that helped. What else would you like to know?",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -65,7 +65,7 @@ export async function generateGroundedAnswer(
   // 7. Conversational Router: Smalltalk (e.g. "how are you", "how's it going")
   if (intent === 'smalltalk') {
     return {
-      answer: "Doing great, thanks for asking! Just working on some AI systems and project ideas. How are you doing?",
+      answer: "Doing great, thanks for asking! How are you doing?",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
@@ -75,14 +75,24 @@ export async function generateGroundedAnswer(
   // 8. Conversational Router: Identity (e.g. "who are you?")
   if (intent === 'identity') {
     return {
-      answer: "I’m Suyash’s AI digital twin! You can ask me about my projects like PathFlow, my machine unlearning research at ICDDS 2025, or my engineering background.",
+      answer: "I’m Suyash’s AI digital twin. You can ask me about his projects, engineering work, research, education, and technical background.",
       citations: [],
       grounded: true,
       retrieved_chunk_ids: [],
     };
   }
 
-  // 9. Prompt Injection Defense
+  // 9. Current / Temporal Activity Handler (e.g. "what are you doing today?", "what did you do today?")
+  if (intent === 'current_activity') {
+    return {
+      answer: "I don't have a verified update on what Suyash is doing today, but I can tell you about the work documented in his profile.",
+      citations: [],
+      grounded: true,
+      retrieved_chunk_ids: [],
+    };
+  }
+
+  // 10. Prompt Injection Defense
   if (intent === 'prompt_injection') {
     return {
       answer: "I am strictly grounded in my verified technical profile. I cannot fabricate personal details, salary, or unverified claims.",
@@ -92,7 +102,7 @@ export async function generateGroundedAnswer(
     };
   }
 
-  // 10. Unsupported Personal Trivia Defense (Natural conversational refusal)
+  // 11. Unsupported Personal Trivia Defense (Natural conversational refusal)
   if (intent === 'unsupported') {
     return {
       answer: "I don't have verified information about that, so I don't want to guess. Ask me anything about my work, projects, or background.",
@@ -102,7 +112,17 @@ export async function generateGroundedAnswer(
     };
   }
 
-  // 11. Conversational Overview ("What can you tell me about Suyash?" / "What would you like to know about me?")
+  // 12. Ambiguous Query Clarification
+  if (intent === 'ambiguous') {
+    return {
+      answer: "Could you clarify what you mean—are you asking about PathFlow, the Semantic LLM Gateway, or his background in general?",
+      citations: [],
+      grounded: true,
+      retrieved_chunk_ids: [],
+    };
+  }
+
+  // 13. Conversational Overview ("What can you tell me about Suyash?" / "What would you like to know about me?")
   if (intent === 'conversational_overview') {
     const citedIds = [
       'resume-identity',
@@ -113,7 +133,7 @@ export async function generateGroundedAnswer(
     ];
     const availableCitations = validateCitations(citedIds, retrievedChunks.length > 0 ? retrievedChunks : KNOWLEDGE_BASE);
     return {
-      answer: "I can tell you about my education, projects (like PathFlow and Semantic LLM Gateway), engineering experience, research in machine unlearning at ICDDS 2025, and technical skills. What interests you most?",
+      answer: "I can tell you about Suyash's education, projects like PathFlow and the Semantic LLM Gateway, engineering experience, research in machine unlearning at ICDDS 2025, and technical skills. What would you like to explore?",
       citations: availableCitations,
       grounded: true,
       retrieved_chunk_ids: citedIds,
@@ -304,7 +324,7 @@ function generateDeterministicGroundedResponse(
   const { intent, subtopic } = classification;
   const qLower = query.toLowerCase().replace(/[’‘]/g, "'");
 
-  // 1. Broad Profile Overview Intent (e.g. "What are you working on?", "Tell me about yourself", "What do you do?")
+  // 1. Broad Profile Overview Intent (e.g. "What does he do?", "Tell me about his background", "What kind of engineer is he?")
   if (intent === 'profile_overview') {
     const citedIds = [
       'resume-identity',
@@ -317,7 +337,7 @@ function generateDeterministicGroundedResponse(
 
     return {
       answer:
-        "Right now, I'm mainly focused on AI systems and backend infrastructure. Recently, I built PathFlow—an OpenTelemetry observability platform for autonomous AI agent fleets—and a Semantic LLM Gateway with sub-50ms Qdrant caching. I also do research in machine unlearning.",
+        "Suyash is a Computer Science student at Manipal Institute of Technology focused on software engineering, AI systems, and backend infrastructure. His work includes PathFlow, the Semantic LLM Gateway, and published research in machine unlearning at ICDDS 2025.",
       citations: availableCitations,
       grounded: true,
       retrieved_chunk_ids: citedIds,
@@ -514,13 +534,13 @@ function generateDeterministicGroundedResponse(
     };
   }
 
-  // 13. General Fallback with Highest-Scored Chunk
+  // 13. General Grounded Fallback with Highest-Scored Chunk
   if (retrievedChunks.length > 0) {
     const primary = retrievedChunks[0];
     const citations = validateCitations([primary.id], retrievedChunks);
     return {
       answer:
-        "I'm a systems engineer and Computer Science student at Manipal focused on AI infrastructure. I've built projects like PathFlow for agent observability and low-latency LLM proxies, and co-authored machine unlearning research at ICDDS 2025.",
+        "Suyash is a systems engineer and Computer Science student at Manipal focused on software engineering and AI infrastructure, including projects like PathFlow and published research in machine unlearning at ICDDS 2025.",
       citations,
       grounded: true,
       retrieved_chunk_ids: [primary.id],

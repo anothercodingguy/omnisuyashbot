@@ -6,7 +6,7 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
   it('Test 1: "hello" -> Natural greeting without citations', async () => {
     const res = await generateGroundedAnswer('hello');
     expect(res.grounded).toBe(true);
-    expect(res.answer).toMatch(/Hey! Great to meet you/i);
+    expect(res.answer).toMatch(/What would you like to know about Suyash/i);
     expect(res.citations.length).toBe(0);
     expect(res.retrieved_chunk_ids.length).toBe(0);
   });
@@ -15,7 +15,7 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
   it('Test 2: "hello hello" -> Natural greeting without citations', async () => {
     const res = await generateGroundedAnswer('hello hello');
     expect(res.grounded).toBe(true);
-    expect(res.answer).toMatch(/Hey! Great to meet you/i);
+    expect(res.answer).toMatch(/What would you like to know about Suyash/i);
     expect(res.citations.length).toBe(0);
     expect(res.retrieved_chunk_ids.length).toBe(0);
   });
@@ -24,7 +24,7 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
   it('Test 3: "who are you?" -> Conversational twin identity response without citations', async () => {
     const res = await generateGroundedAnswer('who are you?');
     expect(res.grounded).toBe(true);
-    expect(res.answer).toMatch(/I’m Suyash’s AI digital twin/i);
+    expect(res.answer).toMatch(/Suyash’s AI digital twin/i);
     expect(res.citations.length).toBe(0);
   });
 
@@ -32,7 +32,7 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
   it('Test 4: "cool, thanks" -> Natural short acknowledgement without citations', async () => {
     const res = await generateGroundedAnswer('cool, thanks');
     expect(res.grounded).toBe(true);
-    expect(res.answer).toMatch(/Glad that helped/i);
+    expect(res.answer).toMatch(/Of course/i);
     expect(res.citations.length).toBe(0);
   });
 
@@ -145,12 +145,21 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
     expect(res.citations.length).toBe(0);
   });
 
-  // Test 16: Conversational Current Work — "okay so like what are you working on currently"
-  it('Test 16: "okay so like what are you working on currently" -> Conversational, human response about focus and projects', async () => {
-    const res = await generateGroundedAnswer('okay so like what are you working on currently');
+  // Test 16: Temporal / Current Activity — "what are you doing today?"
+  it('Test 16: "what are you doing today?" -> Honest refusal without nearest-chunk hallucination', async () => {
+    const res = await generateGroundedAnswer('what are you doing today?');
     expect(res.grounded).toBe(true);
-    expect(res.answer).toMatch(/PathFlow|Semantic LLM Gateway|AI systems|machine unlearning/i);
-    expect(res.answer).not.toMatch(/8\.51 CGPA at Manipal, Codeforces Pupil/i);
-    expect(res.citations.length).toBeGreaterThanOrEqual(2);
+    expect(res.answer).toMatch(/don't have a verified update on what Suyash is doing today/i);
+    expect(res.citations.length).toBe(0);
+    expect(res.retrieved_chunk_ids.length).toBe(0);
+    expect(res.answer).not.toContain('PathFlow');
+  });
+
+  // Test 17: Ambiguous Query — "what did he use?" without prior context
+  it('Test 17: "what did he use?" -> Asks clarifying question without randomly choosing a project', async () => {
+    const res = await generateGroundedAnswer('what did he use?');
+    expect(res.grounded).toBe(true);
+    expect(res.answer).toMatch(/Could you clarify/i);
+    expect(res.citations.length).toBe(0);
   });
 });
