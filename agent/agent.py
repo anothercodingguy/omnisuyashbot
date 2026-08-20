@@ -52,7 +52,8 @@ class SuyashAssistantFunctionContext(llm.FunctionContext):
     async def search_profile(self, query: str) -> str:
         logger.info(f"[RETRIEVAL] Searching verified profile for query: {query}")
         try:
-            res = requests.post(
+            res = await asyncio.to_thread(
+                requests.post,
                 f"{APP_URL}/api/retrieve",
                 json={"query": query},
                 timeout=5

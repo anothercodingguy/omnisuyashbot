@@ -35,7 +35,8 @@ function checkRateLimit(ip: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
+  const forwarded = req.headers.get('x-forwarded-for') || '';
+  const ip = (forwarded.split(',')[0] || '127.0.0.1').trim();
 
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const message = body.message || body.query;
     const history = body.history || [];
 
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
     console.error('[Chat API Error]', error);
     return NextResponse.json(
       {
-        answer: "I'm having trouble accessing Suyash's verified profile information right now, so I don't want to guess.",
+        answer: "I'm having trouble accessing my verified profile information right now, so I don't want to guess.",
         citations: [],
         grounded: false,
         error: 'Failed to process request',
