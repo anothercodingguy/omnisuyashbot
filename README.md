@@ -34,44 +34,38 @@ A production-ready, interactive AI Digital Twin Voice Bot for **Suyash Singh** b
 ## 🏗️ Architecture
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                          CLIENT (Next.js 15)                          │
-│  ┌───────────────────────────┐        ┌─────────────────────────────┐  │
-│  │   Interactive Audio Orb   │        │   Live Transcript Stream    │  │
-│  │   (Real Web Audio FFT)    │        │  (User & Assistant turns)   │  │
-│  └─────────────┬─────────────┘        └──────────────┬──────────────┘  │
-│                │                                     │                 │
-│  ┌─────────────┴─────────────┐        ┌──────────────┴──────────────┐  │
-│  │   LiveKit WebRTC Audio    │        │    Source Citation Drawer   │  │
-│  │  (Microphone & Speaker)   │        │   (Verified Excerpts & IDs) │  │
-│  └─────────────┬─────────────┘        └──────────────┬──────────────┘  │
-└────────────────┼─────────────────────────────────────┼─────────────────┘
-                 │ WebRTC / WebSocket                  │ HTTP / SSE / Data
-                 ▼                                     ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                        BACKEND & AGENT RUNTIME                         │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │  LiveKit Voice Agent & Token Service (/api/livekit/token)        │  │
-│  │  • Real-time speech recognition (STT)                            │  │
-│  │  • Audio stream publishing & turn detection                      │  │
-│  │  • Data packet synchronization for citations                     │  │
-│  └──────────────────────────────────┬───────────────────────────────┘  │
-│                                     │                                  │
-│  ┌──────────────────────────────────▼───────────────────────────────┐  │
-│  │  Unified Grounding & Retrieval Engine (/api/chat, /api/retrieve) │  │
-│  │  • Multi-factor Hybrid Search (BM25 + Semantic Vector Scoring)   │  │
-│  │  • Contextual Pronoun / Entity Resolution                        │  │
-│  │  • Strict System Prompt & Anti-Prompt-Injection Layer            │  │
-│  │  • Structured LLM Reasoning (Groq / Gemini / OpenAI / Fallback)  │  │
-│  │  • Citation Validator (Strips un-retrieved / invalid chunk IDs)  │  │
-│  └──────────────────────────────────┬───────────────────────────────┘  │
-│                                     │                                  │
-│  ┌──────────────────────────────────▼───────────────────────────────┐  │
-│  │  Verified Knowledge Base (lib/knowledge/chunks.ts)               │  │
-│  │  • 12 Atomic Semantic Chunks with Strict Metadata                │  │
-│  │  • Resume Source: suyash_singh_cv (7).pdf (100% Verified)        │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
+Visitor
+   ↓
+Browser
+   ↓
+LiveKit
+   ↓
+STT (Speech-to-Text)
+   ↓
+Profile Retrieval (14 Verified Resume Chunks)
+   ↓
+Groq (Llama 3.3 70B LLM)
+   ↓
+Citation Validation (Zero-Hallucination Guardrail)
+   ↓
+LiveKit TTS (Neural Voice Stream)
+   ↓
+Browser Audio
+   ↓
+Visitor
+```
+
+```mermaid
+graph TD
+    A["👤 Visitor"] --> B["🌐 Browser (Next.js Client)"]
+    B --> C["🎙️ LiveKit WebRTC"]
+    C --> D["🗣️ Speech-to-Text (STT)"]
+    D --> E["🔍 Profile Retrieval (Verified Chunks)"]
+    E --> F["⚡ Groq (Llama 3.3 70B LLM)"]
+    F --> G["🛡️ Citation Validation (Zero-Hallucination)"]
+    G --> H["🔊 LiveKit TTS (Neural Voice Stream)"]
+    H --> I["🔈 Browser Audio Output"]
+    I --> A
 ```
 
 ---
