@@ -241,8 +241,13 @@ export function InteractivePlasmaOrb({
           }
         }
 
-        // Soft outer boundary blending
-        gl_FragColor = vec4(col, alpha);
+        // Smooth radial edge fade to ensure 100% transparent blend before canvas boundary
+        float boundaryFade = smoothstep(0.50, 0.45, dist);
+        col *= boundaryFade;
+        alpha *= boundaryFade;
+
+        // Premultiplied alpha output for clean HTML5 compositor blending
+        gl_FragColor = vec4(col * alpha, alpha);
       }
     `;
 
@@ -296,7 +301,7 @@ export function InteractivePlasmaOrb({
     const stateLocation = gl.getUniformLocation(program, 'u_state');
 
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     let animId: number;
     const startTime = performance.now();
@@ -333,6 +338,9 @@ export function InteractivePlasmaOrb({
       else if (stateRef.current === 'speaking') stateNum = 3.0;
       else if (stateRef.current === 'connecting' || stateRef.current === 'reconnecting') stateNum = 4.0;
 
+      gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
       gl.useProgram(program);
       gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
       gl.uniform1f(timeLocation, elapsed);
@@ -363,12 +371,12 @@ export function InteractivePlasmaOrb({
       className={`relative w-full h-full flex items-center justify-center cursor-pointer select-none transition-transform duration-300 active:scale-98 ${className}`}
     >
       {/* Background Soft Atmospheric Glow Bloom */}
-      <div className="absolute inset-0 bg-radial from-[#00E5FF]/12 via-[#1E88E5]/6 to-transparent blur-3xl pointer-events-none rounded-full" />
+      <div className="absolute inset-0 bg-radial from-[#00E5FF]/14 via-[#1E88E5]/6 to-transparent blur-3xl pointer-events-none rounded-full" />
 
       {/* WebGL Ethereal Plasma Nebula Canvas */}
       <canvas
         ref={canvasRef}
-        className="w-full h-full max-w-[700px] max-h-[700px] object-contain drop-shadow-[0_0_90px_rgba(0,180,255,0.3)]"
+        className="w-full h-full max-w-[700px] max-h-[700px] object-contain pointer-events-none"
       />
     </div>
   );
