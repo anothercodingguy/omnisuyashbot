@@ -304,12 +304,24 @@ export function classifyQuery(rawQuery: string, history: ConversationTurn[] = []
     };
   }
 
-  // 9. "What can you tell me about Suyash?" / Conversational Overview
+  // 9. "What can you tell me about Suyash?" / Conversational Overview / Topic Suggestions
   if (
     normalized.includes('what can you tell me') ||
     normalized.includes('what do you know about') ||
     normalized.includes('what topics do you know') ||
-    normalized.includes('what do you know')
+    normalized.includes('what do you know') ||
+    normalized.includes('what would you like to know') ||
+    normalized.includes('what would you like to talk') ||
+    normalized.includes('what do you want to talk') ||
+    normalized.includes('what can i ask') ||
+    normalized.includes('what should i ask') ||
+    normalized.includes('what can we talk about') ||
+    normalized.includes('what can we discuss') ||
+    normalized.includes('what topics') ||
+    normalized.includes('suggest some questions') ||
+    normalized.includes('suggest questions') ||
+    normalized === 'what' ||
+    normalized === 'what to ask'
   ) {
     return {
       rawQuery,

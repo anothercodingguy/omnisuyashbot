@@ -46,6 +46,14 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
     expect(res.citations.length).toBeGreaterThanOrEqual(2);
   });
 
+  // Test 5b: Echoed Topic Query — "what would you like to know about"
+  it('Test 5b: "what would you like to know about" -> Conversational topic orientation', async () => {
+    const res = await generateGroundedAnswer('what would you like to know about');
+    expect(res.grounded).toBe(true);
+    expect(res.answer).toMatch(/education|projects|engineering|research|technical skills/i);
+    expect(res.citations.length).toBeGreaterThanOrEqual(2);
+  });
+
   // Test 6: Broad Profile Question — "what does he do?"
   it('Test 6: "what does he do?" -> Concise grounded summary with verified citations', async () => {
     const res = await generateGroundedAnswer('what does he do?');
