@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, MessageSquare, Volume2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Phone, PhoneOff, Mic, MicOff, MessageSquare } from 'lucide-react';
 import { VoiceState } from './AudioOrb';
 
 interface CallControlsProps {
@@ -23,16 +23,20 @@ export function CallControls({
 }: CallControlsProps) {
   const isConnected = state !== 'idle' && state !== 'ended' && state !== 'error';
   const [callDuration, setCallDuration] = useState(0);
+  const prevConnectedRef = useRef(isConnected);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isConnected) {
-      interval = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
-    } else {
+    // Reset duration when transitioning from connected to disconnected
+    if (prevConnectedRef.current && !isConnected) {
       setCallDuration(0);
     }
+    prevConnectedRef.current = isConnected;
+
+    if (!isConnected) return;
+
+    const interval = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
     return () => clearInterval(interval);
   }, [isConnected]);
 

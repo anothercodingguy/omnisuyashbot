@@ -175,8 +175,8 @@ export async function POST(req: NextRequest) {
         'Cache-Control': 'public, max-age=3600',
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[TTS] Internal route error:', error);
-    return NextResponse.json({ error: error.message || 'TTS generation failed' }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'TTS generation failed' }, { status: 500 });
   }
 }

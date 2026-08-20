@@ -18,6 +18,16 @@ export function InteractivePlasmaOrb({
 }: InteractivePlasmaOrbProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const audioLevelRef = useRef(audioLevel);
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    audioLevelRef.current = audioLevel;
+  }, [audioLevel]);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -272,7 +282,7 @@ export function InteractivePlasmaOrb({
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     let animId: number;
-    let startTime = performance.now();
+    const startTime = performance.now();
 
     const resize = () => {
       if (!canvas || !containerRef.current) return;
@@ -299,7 +309,7 @@ export function InteractivePlasmaOrb({
       gl.useProgram(program);
       gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
       gl.uniform1f(timeLocation, elapsed);
-      gl.uniform1f(audioLocation, audioLevel);
+      gl.uniform1f(audioLocation, audioLevelRef.current);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -316,7 +326,7 @@ export function InteractivePlasmaOrb({
       gl.deleteShader(fragShader);
       gl.deleteBuffer(positionBuffer);
     };
-  }, [audioLevel]);
+  }, []);
 
   return (
     <div

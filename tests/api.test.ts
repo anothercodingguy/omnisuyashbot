@@ -5,7 +5,7 @@ import { POST as chatPOST } from '../app/api/chat/route';
 import { POST as tokenPOST } from '../app/api/livekit/token/route';
 import { NextRequest } from 'next/server';
 
-function createMockRequest(url: string, body?: any): NextRequest {
+function createMockRequest(url: string, body?: Record<string, unknown>): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost:3000'), {
     method: body ? 'POST' : 'GET',
     headers: { 'Content-Type': 'application/json' },

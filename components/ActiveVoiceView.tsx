@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { VoiceState } from './AudioOrb';
-import { ChatMessage } from './MinimalConversationView';
+import { ChatMessage } from '@/lib/types';
 import { CitationItem } from '@/lib/knowledge/grounding';
 import { InteractivePlasmaOrb } from './InteractivePlasmaOrb';
 import { FullTranscriptDrawer } from './FullTranscriptDrawer';
@@ -39,6 +39,7 @@ export function ActiveVoiceView({
   onEndCall,
   onRestartCall,
   onReturnToHome,
+  onSendMessage,
   onSelectCitation,
   onInterrupt,
   errorMessage,
@@ -49,7 +50,6 @@ export function ActiveVoiceView({
   const isEnded = state === 'ended';
   const isError = state === 'error';
   const isSpeaking = state === 'speaking';
-  const isListening = state === 'listening';
   const isThinking = state === 'thinking';
   const isConnecting = state === 'connecting' || state === 'reconnecting';
 
@@ -241,6 +241,7 @@ export function ActiveVoiceView({
         onClose={() => setIsTranscriptOpen(false)}
         messages={messages}
         onSelectCitation={onSelectCitation}
+        onSendMessage={onSendMessage}
       />
     </div>
   );

@@ -8,7 +8,7 @@ import { FullTranscriptDrawer } from '@/components/FullTranscriptDrawer';
 import { ActiveVoiceView } from '@/components/ActiveVoiceView';
 import { InteractivePlasmaOrb } from '@/components/InteractivePlasmaOrb';
 import { DiaTextAnimation } from '@/components/DiaTextAnimation';
-import { Mic, ArrowUpRight } from 'lucide-react';
+import { Mic } from 'lucide-react';
 
 export default function Home() {
   const {
@@ -104,7 +104,7 @@ export default function Home() {
                   Suyash <span className="text-[#6C768A] font-extralight">Singh</span>
                 </h1>
                 <p className="text-sm sm:text-base text-[#9A9EA6] font-normal leading-relaxed max-w-lg">
-                  AI Digital Twin exploring distributed agent observability (PathFlow), low-latency caching proxies, and machine unlearning research.
+                  Ask my AI twin about my projects, engineering work, research, and the systems I build.
                 </p>
               </div>
 
@@ -157,6 +157,7 @@ export default function Home() {
         onClose={() => setIsTranscriptOpen(false)}
         messages={messages}
         onSelectCitation={openCitation}
+        onSendMessage={sendMessage}
       />
     </div>
   );

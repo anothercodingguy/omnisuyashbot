@@ -24,7 +24,6 @@ export function EditorialTranscript({
   messages,
   interimTranscript,
   onSelectCitation,
-  isSpeaking,
 }: EditorialTranscriptProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 

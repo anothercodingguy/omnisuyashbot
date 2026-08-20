@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { VoiceState } from './AudioOrb';
 import { AgentPersona } from '@/lib/agents';
-import { Mic, MicOff, PhoneOff, Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 
 interface DigitalTwinOrbProps {
   state: VoiceState;

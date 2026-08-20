@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AgentPersona, AGENT_PERSONAS } from '@/lib/agents';
-import { Bot, Sparkles, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 interface AgentSidebarProps {
   selectedAgentId: string;

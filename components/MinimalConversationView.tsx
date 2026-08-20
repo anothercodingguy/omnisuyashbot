@@ -2,16 +2,11 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { CitationItem } from '@/lib/knowledge/grounding';
+import { ChatMessage } from '@/lib/types';
 import { VoiceState } from './AudioOrb';
 import { Mic, MicOff, ArrowUp, ArrowUpRight } from 'lucide-react';
 
-export interface ChatMessage {
-  id: string;
-  sender: 'user' | 'assistant';
-  text: string;
-  citations?: CitationItem[];
-  timestamp: string;
-}
+export type { ChatMessage };
 
 interface MinimalConversationViewProps {
   messages: ChatMessage[];

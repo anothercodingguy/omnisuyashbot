@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Send } from 'lucide-react';
 
 interface TextFallbackProps {
   onSendMessage: (message: string) => void;

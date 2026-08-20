@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   Room,
   RoomEvent,
@@ -11,8 +11,37 @@ import {
   Participant,
 } from 'livekit-client';
 import { VoiceState } from '@/components/AudioOrb';
-import { ChatMessage } from '@/components/LiveTranscript';
+import { ChatMessage } from '@/lib/types';
 import { CitationItem } from '@/lib/knowledge/grounding';
+
+// Web Speech API types (not universally available in all TS DOM lib targets)
+interface WebSpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  [index: number]: { transcript: string; confidence: number };
+}
+
+interface WebSpeechRecognitionEvent {
+  readonly results: WebSpeechRecognitionResult[] & { length: number };
+}
+
+interface WebSpeechRecognitionErrorEvent {
+  readonly error: string;
+}
+
+interface WebSpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onresult: ((event: WebSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: WebSpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
 
 interface UseLiveKitTwinReturn {
   state: VoiceState;
@@ -48,7 +77,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
   const localAnalyserRef = useRef<AnalyserNode | null>(null);
   const remoteAnalyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<WebSpeechRecognition | null>(null);
   const isCallActiveRef = useRef<boolean>(false);
   const animFrameRef = useRef<number | null>(null);
   const audioElementsRef = useRef<HTMLMediaElement[]>([]);
@@ -57,7 +86,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
   // Initialize or resume the Web Audio Context for audio analysis & playback
   const getAudioContext = useCallback(async (): Promise<AudioContext> => {
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       audioContextRef.current = new AudioCtx();
     }
     if (audioContextRef.current.state === 'suspended') {
@@ -97,8 +126,8 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
 
         checkLevel();
       });
-    } catch (e) {
-      console.warn('[Audio Analysis Error]', e);
+    } catch (_e) {
+      console.warn('[Audio Analysis Error]', _e);
     }
   };
 
@@ -111,8 +140,8 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         source.connect(analyser);
         remoteAnalyserRef.current = analyser;
       });
-    } catch (e) {
-      console.warn('[Remote Audio Analysis Error]', e);
+    } catch (_e) {
+      console.warn('[Remote Audio Analysis Error]', _e);
     }
   };
 
@@ -137,7 +166,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       try {
         currentAudioSourceRef.current.stop();
         currentAudioSourceRef.current.disconnect();
-      } catch (e) {}
+      } catch { /* expected if already stopped */ }
       currentAudioSourceRef.current = null;
     }
   }, []);
@@ -257,7 +286,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         } else {
           setState('idle');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('[Chat Error]', err);
         setErrorMessage('Failed to receive grounded answer.');
         if (isCallActiveRef.current) {
@@ -272,10 +301,12 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
   const startSpeechRecognition = useCallback(() => {
     if (typeof window === 'undefined') return;
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognitionCtor = (
+      (window as unknown as Record<string, unknown>).SpeechRecognition ||
+      (window as unknown as Record<string, unknown>).webkitSpeechRecognition
+    ) as (new () => WebSpeechRecognition) | undefined;
 
-    if (!SpeechRecognition) {
+    if (!SpeechRecognitionCtor) {
       console.warn('[STT] Web Speech API not supported in this browser.');
       return;
     }
@@ -284,10 +315,10 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
-        } catch (e) {}
+        } catch { /* expected if already stopped */ }
       }
 
-      const recognition = new SpeechRecognition();
+      const recognition = new SpeechRecognitionCtor();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
@@ -300,7 +331,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
         }
       };
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event) => {
         let currentInterim = '';
         let finalUtterance = '';
 
@@ -332,13 +363,13 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
           // Restart recognition cleanly for next turn
           try {
             recognition.stop();
-          } catch (e) {}
+          } catch { /* expected */ }
 
           sendMessage(cleanedText);
         }
       };
 
-      recognition.onerror = (e: any) => {
+      recognition.onerror = (e) => {
         if (e.error !== 'no-speech' && e.error !== 'aborted') {
           console.warn('[STT] Recognition event notice:', e.error);
         }
@@ -351,7 +382,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
             if (isCallActiveRef.current) {
               try {
                 recognition.start();
-              } catch (e) {}
+              } catch { /* expected */ }
             }
           }, 200);
         }
@@ -362,7 +393,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     } catch (err) {
       console.warn('[STT] Speech recognition start error:', err);
     }
-  }, [sendMessage]);
+  }, [sendMessage, interruptPlayback, state]);
 
   // Connects Call: Connects LiveKit Room + Continuous Real-time Speech Recognition
   const startCall = async () => {
@@ -382,7 +413,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
           mediaStreamRef.current = stream;
           startAudioAnalysis(stream);
         }
-      } catch (micErr: any) {
+      } catch (micErr: unknown) {
         console.warn('[Microphone Permission Notice]', micErr);
         // Continue voice mode so user can interact and hear responses
       }
@@ -395,7 +426,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       }
 
       // 3. Request LiveKit token from backend
-      let tokenData: any = {};
+      let tokenData: { token?: string; url?: string; roomName?: string; participantName?: string; mode?: string } = {};
       try {
         const res = await fetch('/api/livekit/token', {
           method: 'POST',
@@ -493,7 +524,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
       }
 
       setState('listening');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Start Call Error]', err);
       isCallActiveRef.current = false;
       setErrorMessage('Could not initialize voice session. Please try again.');
@@ -512,7 +543,7 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
-      } catch (e) {}
+      } catch { /* expected */ }
       recognitionRef.current = null;
     }
     audioElementsRef.current.forEach((el) => el.remove());
@@ -531,15 +562,16 @@ export function useLiveKitTwin(): UseLiveKitTwinReturn {
   };
 
   const toggleMute = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+
     if (roomRef.current?.localParticipant) {
-      const nextMuted = !isMuted;
       roomRef.current.localParticipant.setMicrophoneEnabled(!nextMuted);
-      setIsMuted(nextMuted);
-    } else if (mediaStreamRef.current) {
+    }
+    if (mediaStreamRef.current) {
       mediaStreamRef.current.getAudioTracks().forEach((track) => {
-        track.enabled = isMuted;
+        track.enabled = !nextMuted;
       });
-      setIsMuted(!isMuted);
     }
   };
 

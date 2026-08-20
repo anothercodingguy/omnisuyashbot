@@ -5,9 +5,20 @@ import { generateGroundedAnswer } from '@/lib/llm/client';
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 40;
+const RATE_LIMIT_CLEANUP_INTERVAL = 5 * 60 * 1000; // Prune stale entries every 5 minutes
+let lastCleanupTime = Date.now();
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Periodic cleanup of expired entries to prevent unbounded Map growth
+  if (now - lastCleanupTime > RATE_LIMIT_CLEANUP_INTERVAL) {
+    for (const [key, entry] of rateLimitMap) {
+      if (now > entry.resetTime) rateLimitMap.delete(key);
+    }
+    lastCleanupTime = now;
+  }
+
   const entry = rateLimitMap.get(ip);
 
   if (!entry || now > entry.resetTime) {

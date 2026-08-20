@@ -24,7 +24,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.style.colorScheme = 'dark';
     try {
       localStorage.setItem('theme', 'dark');
-    } catch (e) {}
+    } catch {
+      // localStorage may be unavailable in some environments
+    }
   }, []);
 
   return (

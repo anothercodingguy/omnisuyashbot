@@ -1,5 +1,5 @@
 import { KNOWLEDGE_BASE, KnowledgeChunk } from './chunks';
-import { classifyQuery, ClassifiedQuery, QueryIntent } from './intent';
+import { classifyQuery, ClassifiedQuery } from './intent';
 
 export interface RetrievalResult {
   chunk: KnowledgeChunk;
@@ -201,7 +201,7 @@ export function searchProfile(
   topK: number = 4
 ): SearchProfileReturn {
   const classification = classifyQuery(rawQuery, history);
-  const { intent, detectedEntity, resolvedContextQuery, normalizedQuery } = classification;
+  const { intent, detectedEntity, resolvedContextQuery } = classification;
   const qLower = resolvedContextQuery.toLowerCase();
   const queryTokens = tokenize(resolvedContextQuery);
 

@@ -12,11 +12,9 @@ export async function generateGroundedAnswer(
   query: string,
   history: ConversationTurn[] = []
 ): Promise<GroundedResponse> {
-  const startTime = Date.now();
-
-  // 1. Retrieve relevant verified profile chunks and classify intent
-  const { results: retrievedChunks, queryUsed, classification } = searchProfile(query, history, 6);
-  const { intent, isConversational, detectedEntity, subtopic } = classification;
+  // Retrieve relevant verified profile chunks and classify intent
+  const { results: retrievedChunks, classification } = searchProfile(query, history, 6);
+  const { intent, isConversational, detectedEntity } = classification;
 
   // 2. Internal Diagnostic Decision Logging
   console.log(`[CONVERSATION-ROUTER] ──────────────────────────────────────────`);

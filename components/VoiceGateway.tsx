@@ -20,7 +20,6 @@ export function VoiceGateway({
   const isListening = state === 'listening';
   const isThinking = state === 'thinking';
   const isSpeaking = state === 'speaking';
-  const isConnecting = state === 'connecting' || state === 'reconnecting';
 
   // Dynamic scale factor derived from audio amplitude
   const dynamicExpansion = isListening || isSpeaking ? 1 + audioLevel * 0.18 : 1;

@@ -2,17 +2,11 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { CitationItem } from '@/lib/knowledge/grounding';
+import { ChatMessage } from '@/lib/types';
 import { AgentPersona } from '@/lib/agents';
-import { ArrowUpRight, Send, Sparkles, FileText, CheckCircle2 } from 'lucide-react';
+import { ArrowUpRight, Send, Sparkles, FileText } from 'lucide-react';
 
-export interface ChatMessage {
-  id: string;
-  sender: 'user' | 'assistant';
-  text: string;
-  citations?: CitationItem[];
-  timestamp: string;
-  isInterim?: boolean;
-}
+export type { ChatMessage };
 
 interface DigitalTwinConversationProps {
   messages: ChatMessage[];
@@ -21,7 +15,7 @@ interface DigitalTwinConversationProps {
   onSelectCitation: (citation: CitationItem) => void;
   onSendMessage: (text: string) => void;
   isLoading: boolean;
-  isSpeaking: boolean;
+  isSpeaking?: boolean;
 }
 
 export function DigitalTwinConversation({
@@ -31,7 +25,6 @@ export function DigitalTwinConversation({
   onSelectCitation,
   onSendMessage,
   isLoading,
-  isSpeaking,
 }: DigitalTwinConversationProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [inputText, setInputText] = useState('');

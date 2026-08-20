@@ -2,17 +2,11 @@
 
 import React, { useEffect, useRef } from 'react';
 import { CitationItem } from '@/lib/knowledge/grounding';
+import { ChatMessage } from '@/lib/types';
 import { Bot, User, Bookmark, CheckCircle, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 
-export interface ChatMessage {
-  id: string;
-  sender: 'user' | 'assistant';
-  text: string;
-  citations?: CitationItem[];
-  timestamp: string;
-  isInterim?: boolean;
-}
+export type { ChatMessage };
 
 interface LiveTranscriptProps {
   messages: ChatMessage[];
@@ -25,7 +19,6 @@ export function LiveTranscript({
   messages,
   interimTranscript,
   onSelectCitation,
-  isSpeaking,
 }: LiveTranscriptProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 

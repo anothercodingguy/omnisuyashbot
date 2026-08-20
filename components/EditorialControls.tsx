@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, PhoneOff, ArrowRight, CornerDownLeft } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mic, MicOff, ArrowRight, CornerDownLeft } from 'lucide-react';
 import { VoiceState } from './AudioOrb';
 
 interface EditorialControlsProps {
@@ -24,16 +24,20 @@ export function EditorialControls({
   const isConnected = state !== 'idle' && state !== 'ended' && state !== 'error';
   const [callDuration, setCallDuration] = useState(0);
   const [textInput, setTextInput] = useState('');
+  const prevConnectedRef = useRef(isConnected);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isConnected) {
-      interval = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
-    } else {
+    // Reset duration when transitioning from connected to disconnected
+    if (prevConnectedRef.current && !isConnected) {
       setCallDuration(0);
     }
+    prevConnectedRef.current = isConnected;
+
+    if (!isConnected) return;
+
+    const interval = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
     return () => clearInterval(interval);
   }, [isConnected]);
 

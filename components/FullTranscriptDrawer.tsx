@@ -3,13 +3,14 @@
 import React, { useEffect, useRef } from 'react';
 import { ChatMessage } from './MinimalConversationView';
 import { CitationItem } from '@/lib/knowledge/grounding';
-import { X, ArrowUpRight, MessageSquare } from 'lucide-react';
+import { X, ArrowUpRight, MessageSquare, Send } from 'lucide-react';
 
 interface FullTranscriptDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   messages: ChatMessage[];
   onSelectCitation: (citation: CitationItem) => void;
+  onSendMessage?: (text: string) => void;
 }
 
 export function FullTranscriptDrawer({
@@ -17,7 +18,9 @@ export function FullTranscriptDrawer({
   onClose,
   messages,
   onSelectCitation,
+  onSendMessage,
 }: FullTranscriptDrawerProps) {
+  const [inputVal, setInputVal] = React.useState('');
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   // Close on Escape key
@@ -125,14 +128,44 @@ export function FullTranscriptDrawer({
           <div ref={bottomRef} />
         </div>
 
+        {/* Optional Text Input Bar */}
+        {onSendMessage && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (inputVal.trim()) {
+                onSendMessage(inputVal.trim());
+                setInputVal('');
+              }
+            }}
+            className="pt-3 pb-1 border-t border-[var(--line)] shrink-0 flex items-center gap-2"
+          >
+            <input
+              type="text"
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              placeholder="Ask a question about Suyash..."
+              className="flex-1 px-3.5 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--line)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-blue)]"
+            />
+            <button
+              type="submit"
+              disabled={!inputVal.trim()}
+              className="p-2 rounded-lg bg-white hover:bg-neutral-200 text-[#0A0D14] disabled:opacity-40 disabled:hover:bg-white transition-colors cursor-pointer"
+              title="Send question"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </form>
+        )}
+
         {/* Footer */}
-        <div className="pt-4 border-t border-[var(--line)] shrink-0 flex items-center justify-between">
+        <div className="pt-3 border-t border-[var(--line)] shrink-0 flex items-center justify-between">
           <span className="text-xs text-[var(--text-muted)]">
             Grounded on verified profile sources
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] text-[var(--btn-text)] text-xs font-medium transition-colors cursor-pointer"
+            className="px-4 py-1.5 rounded-md bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] text-[var(--btn-text)] text-xs font-medium transition-colors cursor-pointer"
           >
             Close
           </button>
