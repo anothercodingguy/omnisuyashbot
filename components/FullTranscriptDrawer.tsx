@@ -144,7 +144,7 @@ export function FullTranscriptDrawer({
               type="text"
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
-              placeholder="Ask a question about Suyash..."
+              placeholder="Ask a question about my work or projects..."
               className="flex-1 px-3.5 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--line)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-blue)]"
             />
             <button

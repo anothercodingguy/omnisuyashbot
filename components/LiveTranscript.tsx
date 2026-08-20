@@ -37,7 +37,7 @@ export function LiveTranscript({
             </div>
             <h4 className="text-sm font-semibold text-slate-200">Start the Conversation</h4>
             <p className="text-xs text-slate-400 max-w-sm mt-1">
-              Click &quot;Talk to Suyash&quot; to speak directly with his AI digital twin, or choose one of the suggested questions below.
+              Click &quot;Talk to Suyash&quot; to speak directly with my AI digital twin, or choose one of the suggested questions below.
             </p>
           </div>
         )}

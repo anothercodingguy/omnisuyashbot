@@ -164,7 +164,7 @@ export function MinimalConversationView({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isLoading}
-            placeholder="Ask something about Suyash..."
+            placeholder="Ask a question about my work or projects..."
             className="w-full py-3.5 pl-4 pr-12 text-sm bg-[var(--bg-input)] border border-[var(--line)] rounded-md text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--text-primary)] transition-colors shadow-2xs disabled:opacity-50 font-sans"
           />
           <button

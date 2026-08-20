@@ -6,7 +6,7 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
   it('Test 1: "hello" -> Natural greeting without citations', async () => {
     const res = await generateGroundedAnswer('hello');
     expect(res.grounded).toBe(true);
-    expect(res.answer).toBe('Hey! What would you like to know about Suyash?');
+    expect(res.answer).toBe('Hey! What would you like to know about me?');
     expect(res.citations.length).toBe(0);
     expect(res.retrieved_chunk_ids.length).toBe(0);
   });
@@ -15,7 +15,7 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
   it('Test 2: "hello hello" -> Natural greeting without citations', async () => {
     const res = await generateGroundedAnswer('hello hello');
     expect(res.grounded).toBe(true);
-    expect(res.answer).toBe('Hey! What would you like to know about Suyash?');
+    expect(res.answer).toBe('Hey! What would you like to know about me?');
     expect(res.citations.length).toBe(0);
     expect(res.retrieved_chunk_ids.length).toBe(0);
   });
@@ -25,7 +25,7 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
     const res = await generateGroundedAnswer('who are you?');
     expect(res.grounded).toBe(true);
     expect(res.answer).toBe(
-      'I’m Suyash’s AI digital twin. You can ask me about his projects, engineering work, research, and technical background.'
+      'I’m Suyash’s AI digital twin. You can ask me about my projects, engineering work, research, and technical background.'
     );
     expect(res.citations.length).toBe(0);
   });
@@ -34,7 +34,7 @@ describe('Voicebot Natural Conversational & Grounded Acceptance Tests', () => {
   it('Test 4: "cool, thanks" -> Natural short acknowledgement without citations', async () => {
     const res = await generateGroundedAnswer('cool, thanks');
     expect(res.grounded).toBe(true);
-    expect(res.answer).toBe('Of course!');
+    expect(res.answer).toMatch(/Of course!/i);
     expect(res.citations.length).toBe(0);
   });
 
